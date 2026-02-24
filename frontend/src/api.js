@@ -6,16 +6,13 @@ pb.autoCancellation(false)
 let authToken = null
 
 export async function initAuth() {
-  const config = window.__CONFIG__ || {}
-  const email = config.PB_ADMIN_EMAIL
-  const password = config.PB_ADMIN_PASSWORD
-
-  if (!email || !password) {
-    throw new Error('Missing PocketBase credentials in window.__CONFIG__')
+  const res = await fetch('/pb/api/cf-auth', { method: 'POST' })
+  if (!res.ok) {
+    throw new Error(`CF auth failed: ${res.status} ${await res.text()}`)
   }
-
-  const auth = await pb.admins.authWithPassword(email, password)
-  authToken = auth.token
+  const data = await res.json()
+  authToken = data.token
+  pb.authStore.save(authToken, data.record)
   return authToken
 }
 

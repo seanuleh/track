@@ -1,12 +1,9 @@
 #!/bin/sh
 set -e
 
-# Inject runtime config for the React app
+# No runtime credentials needed — auth is handled server-side via CF Access JWT
 cat > /usr/share/nginx/html/config.js <<EOF
-window.__CONFIG__ = {
-  PB_ADMIN_EMAIL: "${PB_ADMIN_EMAIL}",
-  PB_ADMIN_PASSWORD: "${PB_ADMIN_PASSWORD}"
-};
+window.__CONFIG__ = {};
 EOF
 
 echo "Config written."

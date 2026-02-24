@@ -36,6 +36,25 @@ AUTH_RESP=$(wget -q -O - --post-data="{\"identity\":\"${PB_ADMIN_EMAIL}\",\"pass
 TOKEN=$(echo "$AUTH_RESP" | sed 's/.*"token":"\([^"]*\)".*/\1/')
 echo "Got token: ${TOKEN:0:20}..."
 
+# Create users auth collection (no-op if exists)
+# Users are created on-demand by the cf_auth hook — no static accounts needed.
+echo "Creating users auth collection..."
+USERS_COLLECTION_PAYLOAD='{
+  "name": "users",
+  "type": "auth",
+  "schema": [],
+  "listRule": "@request.auth.id != \"\"",
+  "viewRule": "@request.auth.id != \"\"",
+  "createRule": null,
+  "updateRule": "@request.auth.id = id",
+  "deleteRule": null
+}'
+USERS_COLL_RESP=$(wget -q -O - --post-data="$USERS_COLLECTION_PAYLOAD" \
+  --header="Content-Type: application/json" \
+  --header="Authorization: ${TOKEN}" \
+  http://localhost:8090/api/collections 2>&1 || true)
+echo "Users collection create response: $USERS_COLL_RESP"
+
 # Create weight_entries collection (no-op if exists)
 echo "Creating weight_entries collection..."
 COLLECTION_PAYLOAD='{
@@ -61,11 +80,11 @@ COLLECTION_PAYLOAD='{
       "options": {}
     }
   ],
-  "listRule": null,
-  "viewRule": null,
-  "createRule": null,
-  "updateRule": null,
-  "deleteRule": null
+  "listRule": "@request.auth.id != \"\"",
+  "viewRule": "@request.auth.id != \"\"",
+  "createRule": "@request.auth.id != \"\"",
+  "updateRule": "@request.auth.id != \"\"",
+  "deleteRule": "@request.auth.id != \"\""
 }'
 
 COLL_RESP=$(wget -q -O - --post-data="$COLLECTION_PAYLOAD" \
