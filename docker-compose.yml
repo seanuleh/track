@@ -1,0 +1,32 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    environment:
+      - PB_ADMIN_EMAIL=${PB_ADMIN_EMAIL}
+      - PB_ADMIN_PASSWORD=${PB_ADMIN_PASSWORD}
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    networks:
+      - track_net
+
+  pocketbase:
+    build: ./pocketbase
+    environment:
+      - PB_ADMIN_EMAIL=${PB_ADMIN_EMAIL}
+      - PB_ADMIN_PASSWORD=${PB_ADMIN_PASSWORD}
+    volumes:
+      - ${PB_DATA_PATH:-./pb_data}:/pb/pb_data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - track_net
+
+networks:
+  track_net:
+    driver: bridge
