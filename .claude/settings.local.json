@@ -4,7 +4,9 @@
       "Bash(docker compose:*)",
       "Bash(curl:*)",
       "Bash(ls:*)",
-      "Bash(ss:*)"
+      "Bash(ss:*)",
+      "Bash(identify /tmp/Screenshot_20260224_222318_MyFitnessPal.jpg)",
+      "Bash(python3:*)"
     ]
   }
 }

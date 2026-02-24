@@ -4,83 +4,57 @@ Self-hosted Docker Compose weight tracking app. React SPA + PocketBase backend. 
 
 ## Current Status
 
-App is fully implemented and working. Tested locally by running PocketBase and Vite dev server directly (no Docker). Next step: deploy with Docker Compose on a machine that has Docker.
+Fully deployed at `track.uleh.tv` on the uleh home server. Running behind Cloudflare Access (nginx reverse proxy → Docker Compose stack on port 3002).
 
 ## Architecture
 
 ```
-Host port 3000
+Cloudflare Access (JWT validation at edge)
+     │  Cf-Access-Jwt-Assertion header injected
+     ▼
+[nginx host] :443  track.uleh.tv.conf → localhost:3002
      │
-  [frontend] nginx container
+  [frontend] nginx container :3002
      ├── serves React SPA at /
-     ├── serves /config.js (runtime env inject for PB credentials)
+     ├── serves /config.js (empty — no credentials)
      └── proxies /pb/ → [pocketbase]:8090 (internal Docker network)
-                              │
-                         [pocketbase] container
-                              └── /pb/pb_data → host volume
+          │  forwards Cf-Access-Jwt-Assertion header
+          ▼
+     [pocketbase] container :8090
+          ├── pb_hooks/cf_auth.pb.js  → POST /api/cf-auth
+          └── /pb/pb_data → host volume
 ```
 
-- PocketBase is **not** exposed to the host — only reachable via nginx proxy at `/pb/`
-- Admin credentials are injected via Docker env vars → `window.__CONFIG__` → `api.js` auto-logs in
-- No user-facing login screen
+## Auth Flow
+
+No login screen. On app load:
+
+1. Frontend calls `POST /pb/api/cf-auth`
+2. PocketBase hook (`pb_hooks/cf_auth.pb.js`) reads the `Cf-Access-Jwt-Assertion` header injected by Cloudflare Access
+3. Decodes the JWT payload, extracts the user's email
+4. Finds or creates a PocketBase `users` record for that email (random unusable password — CF is the only login path)
+5. Returns a PocketBase auth token
+6. Frontend stores token in `pb.authStore`, all subsequent CRUD requests are authenticated as that user
+
+Admin credentials (`PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`) are only used for the PocketBase admin UI at `/pb/_/` — never exposed to the browser.
 
 ## Getting Started with Docker
 
 ```sh
 cp .env.example .env
-# Edit .env — set PB_ADMIN_EMAIL and PB_ADMIN_PASSWORD
-docker compose up --build
+# Edit .env — set PB_ADMIN_EMAIL and PB_ADMIN_PASSWORD (min 10 chars)
+docker compose up --build -d
 ```
 
-Open http://localhost:3000 (or whatever `FRONTEND_PORT` is set to).
+Requires Cloudflare Access in front to inject the CF JWT header. Without it all requests return 401.
 
-PocketBase admin dashboard: `http://localhost:3000/pb/_/`
+PocketBase admin dashboard: `http://localhost:<FRONTEND_PORT>/pb/_/`
 
 Data persists via volume at `PB_DATA_PATH` (default `./pb_data/`).
 
-## Running Locally Without Docker (dev)
+**To reset the database**: stop containers, delete `pb_data/`, run `docker compose up -d`.
 
-Requires Node.js and a PocketBase binary.
-
-1. Download PocketBase for your platform from https://github.com/pocketbase/pocketbase/releases (tested with v0.22.22)
-2. Place binary at `./pb_bin/pocketbase`
-3. First run — init admin and collection:
-
-```sh
-# Start PB in background
-./pb_bin/pocketbase serve --http=127.0.0.1:8090 --dir=./pb_data &
-
-# Create admin
-curl -s -X POST http://127.0.0.1:8090/api/admins \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"changeme123","passwordConfirm":"changeme123"}'
-
-# Auth and get token
-TOKEN=$(curl -s -X POST http://127.0.0.1:8090/api/admins/auth-with-password \
-  -H "Content-Type: application/json" \
-  -d '{"identity":"admin@example.com","password":"changeme123"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-
-# Create collection
-curl -s -X POST http://127.0.0.1:8090/api/collections \
-  -H "Content-Type: application/json" \
-  -H "Authorization: $TOKEN" \
-  -d '{
-    "name": "weight_entries", "type": "base",
-    "schema": [
-      {"name":"date","type":"text","required":true,"options":{}},
-      {"name":"weight","type":"number","required":true,"options":{"min":0}},
-      {"name":"notes","type":"text","required":false,"options":{}}
-    ],
-    "listRule":null,"viewRule":null,"createRule":null,"updateRule":null,"deleteRule":null
-  }'
-
-# Start frontend
-npm install --prefix frontend
-npm run dev --prefix frontend -- --port 3000
-```
-
-Subsequent runs: just start PB and Vite — data and admin persist in `./pb_data/`.
+**Note**: Use `docker compose up -d` (not `restart`) after `.env` changes — restart doesn't reload env vars.
 
 ## File Structure
 
@@ -89,22 +63,25 @@ track/
 ├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
+├── README.md
 ├── CLAUDE.md
+├── pb_hooks/
+│   └── cf_auth.pb.js       # CF JWT → find-or-create PB user → return token
 ├── pocketbase/
-│   ├── Dockerfile          # Downloads PB 0.22.22 binary (alpine)
-│   └── entrypoint.sh       # Idempotent init: creates admin + collection, then serves
+│   ├── Dockerfile           # Downloads PB 0.22.22 binary (alpine)
+│   └── entrypoint.sh        # Idempotent init: admin + users collection + weight_entries
 └── frontend/
-    ├── Dockerfile           # Multi-stage: Vite build → nginx:alpine
-    ├── entrypoint.sh        # Writes window.__CONFIG__ from env vars, starts nginx
-    ├── nginx.conf           # SPA fallback + /pb/ proxy with WebSocket support
-    ├── package.json         # react 18, recharts, pocketbase sdk, vite
-    ├── vite.config.js       # Dev proxy: /pb → localhost:8090
-    ├── index.html           # Loads /config.js before module scripts
+    ├── Dockerfile            # Multi-stage: Vite build → nginx:alpine
+    ├── entrypoint.sh         # Writes empty /config.js, starts nginx
+    ├── nginx.conf            # SPA fallback + /pb/ proxy (forwards CF JWT header)
+    ├── package.json          # react 18, recharts, pocketbase sdk, vite
+    ├── vite.config.js        # Dev proxy: /pb → localhost:8090
+    ├── index.html
     └── src/
         ├── main.jsx
-        ├── App.jsx           # State, window filtering, delta calc, layout
-        ├── App.css           # Dark theme, CSS custom props, mobile-first
-        ├── api.js            # PocketBase admin auth + CRUD
+        ├── App.jsx            # State, window filtering, delta calc, layout
+        ├── App.css            # Dark theme, CSS custom props, mobile-first
+        ├── api.js             # CF auth + PocketBase CRUD
         └── components/
             ├── WeightChart.jsx    # Recharts ResponsiveContainer LineChart
             ├── EntryList.jsx      # Reverse-sorted history cards
@@ -114,25 +91,29 @@ track/
 
 ## Key Implementation Details
 
-**Auth (`api.js`)**: Calls `pb.admins.authWithPassword()` on app init using credentials from `window.__CONFIG__`. Token stored in module scope. All CRUD uses admin token — no collection rules needed.
+**Auth (`api.js`)**: On init, calls `POST /pb/api/cf-auth` (no credentials needed — CF JWT is in the header automatically). Saves the returned token + user record to `pb.authStore`. All CRUD requests use this token.
 
-**PocketBase init (`pocketbase/entrypoint.sh`)**: Fully idempotent. Starts PB in background, waits for `/api/health`, creates admin (no-ops if exists), authenticates, creates `weight_entries` collection (no-ops if exists), stops background PB, then execs PB in foreground.
+**CF auth hook (`pb_hooks/cf_auth.pb.js`)**: Registered via `routerAdd`. Decodes the JWT payload with a pure-JS base64url decoder (goja runtime doesn't have `atob` or `$base64`). Uses `$app.dao().findAuthRecordByEmail()` for lookup and `$tokens.recordAuthToken()` to generate the PB token.
 
-**Runtime config**: `frontend/entrypoint.sh` writes `/config.js` at nginx startup from Docker env vars. `index.html` loads it via `<script src="/config.js">` before module scripts so `window.__CONFIG__` is available synchronously.
+**PocketBase init (`pocketbase/entrypoint.sh`)**: Idempotent. Creates: admin account, `users` auth collection (rules: authenticated users only), `weight_entries` collection (rules: `@request.auth.id != ""`). Stops background PB, then execs in foreground.
 
-**Vite dev proxy**: `vite.config.js` rewrites `/pb/*` → `http://localhost:8090/*` so the dev server behaves identically to the nginx proxy in production.
+**Frontend nginx**: Passes `Cf-Access-Jwt-Assertion` header through to PocketBase via `proxy_set_header`.
 
-## PocketBase Collection Schema
+**Vite dev proxy**: `vite.config.js` rewrites `/pb/*` → `http://localhost:8090/*`. Dev mode won't work without a CF JWT — you'd need to mock the header or temporarily relax the hook.
 
-Collection name: `weight_entries`
+## PocketBase Collections
 
-| Field  | Type   | Required | Notes          |
-|--------|--------|----------|----------------|
-| date   | text   | yes      | YYYY-MM-DD     |
-| weight | number | yes      | kg, min: 0     |
-| notes  | text   | no       |                |
+**`users`** (auth collection) — created on first CF login, no static accounts
 
-All rules null (admin bypasses anyway).
+**`weight_entries`** (base collection)
+
+| Field  | Type   | Required | Notes      |
+|--------|--------|----------|------------|
+| date   | text   | yes      | YYYY-MM-DD |
+| weight | number | yes      | kg, min: 0 |
+| notes  | text   | no       |            |
+
+Rules on both collections: `@request.auth.id != ""` (any authenticated user).
 
 ## UI
 
@@ -146,6 +127,6 @@ All rules null (admin bypasses anyway).
 
 ## Dependencies
 
-- `pocketbase` SDK `^0.21.5` — uses `pb.admins.authWithPassword()` and `pb.collection()` CRUD
+- `pocketbase` SDK `^0.21.5` — uses `pb.authStore` and `pb.collection()` CRUD
 - `recharts` `^2.10` — `ResponsiveContainer`, `LineChart`, `Line`, `XAxis`, `YAxis`, `Tooltip`, `CartesianGrid`
 - PocketBase binary `0.22.22` — uses `/api/admins` endpoints (not the newer superusers API)

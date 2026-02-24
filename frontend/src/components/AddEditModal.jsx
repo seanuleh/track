@@ -38,8 +38,8 @@ export default function AddEditModal({ entry, onSave, onClose }) {
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <div className="modal-title">{entry ? 'Edit Entry' : 'Add Entry'}</div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <div className="modal-title">{entry ? 'Edit entry' : 'Add entry'}</div>
+          <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -81,12 +81,12 @@ export default function AddEditModal({ entry, onSave, onClose }) {
             />
           </div>
 
-          {error && <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>{error}</div>}
+          {error && <div className="form-error">{error}</div>}
 
           <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </form>
