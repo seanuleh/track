@@ -4,7 +4,7 @@ Self-hosted Docker Compose weight tracking app. React SPA + PocketBase backend. 
 
 ## Current Status
 
-Fully deployed at `track.uleh.tv` on the uleh home server. Running behind Cloudflare Access (nginx reverse proxy → Docker Compose stack on port 3002).
+Fully deployed at `track.uleh.tv` on the uleh home server. Running behind Cloudflare Access (nginx reverse proxy → Docker Compose stack on port 3003). Debug instance runs on port 3002 from the local dev compose file.
 
 ## Architecture
 
@@ -12,18 +12,40 @@ Fully deployed at `track.uleh.tv` on the uleh home server. Running behind Cloudf
 Cloudflare Access (JWT validation at edge)
      │  Cf-Access-Jwt-Assertion header injected
      ▼
-[nginx host] :443  track.uleh.tv.conf → localhost:3002
+[nginx host] :443  track.uleh.tv.conf → track-frontend:80 (Docker container, pirate network)
      │
-  [frontend] nginx container :3002
+  [frontend] nginx container :3003
      ├── serves React SPA at /
      ├── serves /config.js (empty — no credentials)
      └── proxies /pb/ → [pocketbase]:8090 (internal Docker network)
           │  forwards Cf-Access-Jwt-Assertion header
           ▼
-     [pocketbase] container :8090
+     [track-pocketbase] container :8090
           ├── pb_hooks/cf_auth.pb.js  → POST /api/cf-auth
-          └── /pb/pb_data → host volume
+          └── /pb/pb_data → /data/track (host volume)
 ```
+
+## Production Deployment
+
+Defined in `/home/sean/docker-compose.yml` alongside all other server services.
+
+- `track-frontend`: builds from `/home/sean/git/seanuleh/track/frontend`, port 3003
+- `track-pocketbase`: builds from `/home/sean/git/seanuleh/track/pocketbase`, no exposed port
+- PocketBase data persists at `/data/track`
+- `pb_hooks/` mounted from git repo at `/home/sean/git/seanuleh/track/pb_hooks` (hot-reloaded by PocketBase — no rebuild needed for hook changes)
+- `track-pocketbase` has network alias `pocketbase` on the `pirate` network (required by the frontend nginx.conf which hardcodes that hostname)
+- nginx config: `/data/nginx/conf.d/track.uleh.tv.conf`
+
+To rebuild and redeploy after frontend changes:
+```sh
+docker compose up -d --build track-frontend
+```
+
+## Home Network Access
+
+Pi-hole conditional forwarding routes all `uleh.tv` DNS queries directly to the server LAN IP (`192.168.1.1`), bypassing Cloudflare — so no CF JWT gets injected for home network traffic.
+
+**Fix**: Add local DNS records in Pi-hole for `track.uleh.tv` pointing to Cloudflare's anycast IPs (`172.67.190.109`, `104.21.19.225`). Pi-hole serves local records before forwarding, so `track.uleh.tv` resolves via Cloudflare (JWT injected) while all other `uleh.tv` subdomains still resolve locally.
 
 ## Auth Flow
 
@@ -36,7 +58,7 @@ No login screen. On app load:
 5. Returns a PocketBase auth token
 6. Frontend stores token in `pb.authStore`, all subsequent CRUD requests are authenticated as that user
 
-Admin credentials (`PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`) are only used for the PocketBase admin UI at `/pb/_/` — never exposed to the browser.
+Admin credentials (`PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`) are only used for the PocketBase admin UI at `/pb/_/` — set in `docker-compose.yml` environment for `track-pocketbase` only (`track-frontend` does not need them).
 
 ## Getting Started with Docker
 
@@ -73,18 +95,18 @@ track/
 └── frontend/
     ├── Dockerfile            # Multi-stage: Vite build → nginx:alpine
     ├── entrypoint.sh         # Writes empty /config.js, starts nginx
-    ├── nginx.conf            # SPA fallback + /pb/ proxy (forwards CF JWT header)
+    ├── nginx.conf            # SPA fallback + /pb/ proxy (forwards CF JWT header); upstream hostname must be "pocketbase"
     ├── package.json          # react 18, recharts, pocketbase sdk, vite
     ├── vite.config.js        # Dev proxy: /pb → localhost:8090
     ├── index.html
     └── src/
         ├── main.jsx
         ├── App.jsx            # State, window filtering, delta calc, layout
-        ├── App.css            # Dark theme, CSS custom props, mobile-first
+        ├── App.css            # Light theme (cool & clinical), CSS custom props, mobile-first
         ├── api.js             # CF auth + PocketBase CRUD
         └── components/
-            ├── WeightChart.jsx    # Recharts ResponsiveContainer LineChart
-            ├── EntryList.jsx      # Reverse-sorted history cards
+            ├── WeightChart.jsx    # Recharts AreaChart, time-proportional X axis (timestamps)
+            ├── EntryList.jsx      # Reverse-chrono cards, infinite scroll, tap-to-reveal actions
             ├── AddEditModal.jsx   # Bottom-sheet modal (slides up on mobile)
             └── FAB.jsx            # Fixed + button, bottom-right
 ```
@@ -93,13 +115,19 @@ track/
 
 **Auth (`api.js`)**: On init, calls `POST /pb/api/cf-auth` (no credentials needed — CF JWT is in the header automatically). Saves the returned token + user record to `pb.authStore`. All CRUD requests use this token.
 
-**CF auth hook (`pb_hooks/cf_auth.pb.js`)**: Registered via `routerAdd`. Decodes the JWT payload with a pure-JS base64url decoder (goja runtime doesn't have `atob` or `$base64`). Uses `$app.dao().findAuthRecordByEmail()` for lookup and `$tokens.recordAuthToken()` to generate the PB token.
+**CF auth hook (`pb_hooks/cf_auth.pb.js`)**: Registered via `routerAdd`. Decodes the JWT payload with a pure-JS base64url decoder (goja runtime doesn't have `atob` or `$base64`). Uses `$app.dao().findAuthRecordByEmail()` for lookup and `$tokens.recordAuthToken()` to generate the PB token. Hook file is hot-reloaded by PocketBase — no container restart needed after edits.
 
 **PocketBase init (`pocketbase/entrypoint.sh`)**: Idempotent. Creates: admin account, `users` auth collection (rules: authenticated users only), `weight_entries` collection (rules: `@request.auth.id != ""`). Stops background PB, then execs in foreground.
 
-**Frontend nginx**: Passes `Cf-Access-Jwt-Assertion` header through to PocketBase via `proxy_set_header`.
+**Frontend nginx**: Passes `Cf-Access-Jwt-Assertion` header through to PocketBase via `proxy_set_header`. Upstream is hardcoded as `pocketbase:8090` — in production the `track-pocketbase` container must have network alias `pocketbase`.
 
 **Vite dev proxy**: `vite.config.js` rewrites `/pb/*` → `http://localhost:8090/*`. Dev mode won't work without a CF JWT — you'd need to mock the header or temporarily relax the hook.
+
+**Time window filtering (`App.jsx`)**: `filterByWindow` prepends an anchor data point pinned to the cutoff date (from the last entry before the window) so the chart line starts at the left edge. Anchor is only added if the oldest in-range entry is strictly after the cutoff (avoids duplicate points when a real entry falls exactly on the cutoff date). Selected window persists to `localStorage`.
+
+**Chart (`WeightChart.jsx`)**: Uses `AreaChart` with `type="number" scale="time"` X axis and Unix timestamps. Custom tick generation (daily/weekly/monthly/yearly) based on span. Ticks are filtered to `[minTs, maxTs]` to prevent Recharts from extending the domain leftward. Y-axis width is dynamic based on the character length of the max value.
+
+**Entry list (`EntryList.jsx`)**: Infinite scroll via `IntersectionObserver` sentinel — loads 20 entries at a time. Edit/delete actions are icon buttons, hidden by default, revealed on hover (desktop) or tap (mobile) via `.actions-visible` class.
 
 ## PocketBase Collections
 
@@ -118,15 +146,15 @@ Rules on both collections: `@request.auth.id != ""` (any authenticated user).
 ## UI
 
 - **Header**: current weight large + delta badge (colored green/red) vs selected window
-- **Time windows**: `1W | 1M | 3M | 6M | 1Y | All` pill buttons, default 3M
-- **Chart**: Recharts LineChart, sky-blue line (`#38bdf8`), dark card, custom tooltip
-- **Entry list**: reverse-chrono cards, weight + date + notes, edit/delete buttons
+- **Time windows**: `1W | 1M | 3M | 6M | 1Y | 2Y | 3Y | All` pill buttons, default 3M, persisted to localStorage
+- **Chart**: Recharts AreaChart, indigo line (`#3b5bdb`), proportional time X axis, custom tooltip
+- **Entry list**: reverse-chrono cards, date left / weight right, icon edit/delete, infinite scroll
 - **FAB**: fixed bottom-right `+` opens modal
 - **Modal**: slides up from bottom on mobile, centered on desktop
-- **Theme**: dark — bg `#0a0f1e`, surface `#111827`, primary `#38bdf8`, danger `#f87171`, success `#4ade80`
+- **Theme**: light — bg `#f2f4f7`, surface `#ffffff`, accent `#3b5bdb`, fonts: Cormorant Garamond (display) + Jost (body)
 
 ## Dependencies
 
 - `pocketbase` SDK `^0.21.5` — uses `pb.authStore` and `pb.collection()` CRUD
-- `recharts` `^2.10` — `ResponsiveContainer`, `LineChart`, `Line`, `XAxis`, `YAxis`, `Tooltip`, `CartesianGrid`
+- `recharts` `^2.10` — `ResponsiveContainer`, `AreaChart`, `Area`, `XAxis`, `YAxis`, `Tooltip`, `CartesianGrid`
 - PocketBase binary `0.22.22` — uses `/api/admins` endpoints (not the newer superusers API)
