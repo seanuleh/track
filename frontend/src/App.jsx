@@ -24,7 +24,7 @@ function filterByWindow(entries, days) {
   const inRange = entries.filter(e => e.date >= cutoffStr)
   const before = entries.filter(e => e.date < cutoffStr)
   // Pin the anchor point to the cutoff date so the line starts exactly at the left edge
-  if (before.length > 0 && inRange.length > 0) {
+  if (before.length > 0 && inRange.length > 0 && inRange[inRange.length - 1].date > cutoffStr) {
     return [{ ...before[0], date: cutoffStr }, ...inRange]
   }
   return inRange
