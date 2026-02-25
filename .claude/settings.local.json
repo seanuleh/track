@@ -7,7 +7,8 @@
       "Bash(ss:*)",
       "Bash(identify /tmp/Screenshot_20260224_222318_MyFitnessPal.jpg)",
       "Bash(python3:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(docker exec:*)"
     ]
   }
 }

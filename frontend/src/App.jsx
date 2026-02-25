@@ -25,7 +25,7 @@ function filterByWindow(entries, days) {
   const before = entries.filter(e => e.date < cutoffStr)
   // Pin the anchor point to the cutoff date so the line starts exactly at the left edge
   if (before.length > 0 && inRange.length > 0 && inRange[inRange.length - 1].date > cutoffStr) {
-    return [{ ...before[0], date: cutoffStr }, ...inRange]
+    return [{ ...before[0], date: cutoffStr, _anchor: true }, ...inRange]
   }
   return inRange
 }
@@ -146,7 +146,7 @@ export default function App() {
       <div>
         <div className="section-title">History</div>
         <EntryList
-          entries={filtered}
+          entries={filtered.filter(e => !e._anchor)}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />

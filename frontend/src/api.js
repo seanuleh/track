@@ -24,7 +24,7 @@ export async function getEntries() {
 }
 
 export async function createEntry({ date, weight, notes }) {
-  return pb.collection('weight_entries').create({ date, weight, notes })
+  return pb.collection('weight_entries').create({ date, weight, notes, user: pb.authStore.model.id })
 }
 
 export async function updateEntry(id, { date, weight, notes }) {

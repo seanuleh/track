@@ -78,13 +78,19 @@ COLLECTION_PAYLOAD='{
       "type": "text",
       "required": false,
       "options": {}
+    },
+    {
+      "name": "user",
+      "type": "relation",
+      "required": true,
+      "options": {"collectionId": "_pb_users_auth_", "cascadeDelete": false, "minSelect": null, "maxSelect": 1, "displayFields": []}
     }
   ],
-  "listRule": "@request.auth.id != \"\"",
-  "viewRule": "@request.auth.id != \"\"",
+  "listRule": "@request.auth.id = user",
+  "viewRule": "@request.auth.id = user",
   "createRule": "@request.auth.id != \"\"",
-  "updateRule": "@request.auth.id != \"\"",
-  "deleteRule": "@request.auth.id != \"\""
+  "updateRule": "@request.auth.id = user",
+  "deleteRule": "@request.auth.id = user"
 }'
 
 COLL_RESP=$(wget -q -O - --post-data="$COLLECTION_PAYLOAD" \
