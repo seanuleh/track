@@ -8,13 +8,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "pocketbase": "^0.21.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.10.4",
-    "pocketbase": "^0.21.5"
+    "recharts": "^2.10.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.14"
+    "vite": "^5.4.14",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }
