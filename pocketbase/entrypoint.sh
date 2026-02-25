@@ -111,25 +111,6 @@ COLL_RESP=$(wget -q -O - --post-data="$COLLECTION_PAYLOAD" \
   http://localhost:8090/api/collections 2>&1 || true)
 echo "Collection create response: $COLL_RESP"
 
-# Add medication/dose_mg fields to weight_entries if they don't exist (migration for existing installs)
-echo "Migrating weight_entries: ensuring medication and dose_mg fields exist..."
-CURRENT_SCHEMA=$(wget -q -O - \
-  --header="Authorization: ${TOKEN}" \
-  http://localhost:8090/api/collections/weight_entries 2>/dev/null || echo "")
-
-if echo "$CURRENT_SCHEMA" | grep -q '"medication"'; then
-  echo "medication field already exists — skipping migration."
-else
-  echo "Adding medication and dose_mg fields..."
-  MIGRATE_RESP=$(wget -q -O - \
-    --method=PATCH \
-    --body-data='{"schema":[{"name":"date","type":"text","required":true,"options":{}},{"name":"weight","type":"number","required":true,"options":{"min":0,"max":null}},{"name":"notes","type":"text","required":false,"options":{}},{"name":"medication","type":"text","required":false,"options":{}},{"name":"dose_mg","type":"number","required":false,"options":{"min":0,"max":null}},{"name":"user","type":"relation","required":true,"options":{"collectionId":"_pb_users_auth_","cascadeDelete":false,"minSelect":null,"maxSelect":1,"displayFields":[]}}]}' \
-    --header="Content-Type: application/json" \
-    --header="Authorization: ${TOKEN}" \
-    http://localhost:8090/api/collections/weight_entries 2>&1 || true)
-  echo "Migration response: $MIGRATE_RESP"
-fi
-
 # Stop background PocketBase
 echo "Stopping background PocketBase..."
 kill $PB_PID
