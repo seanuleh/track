@@ -2,6 +2,16 @@
 
 Self-hosted Docker Compose weight tracking app. React SPA + PocketBase backend. Units: **kg**.
 
+## ⚠️ IMPORTANT: Always Back Up Before Migrations
+
+Before making any changes to the PocketBase schema (collection PATCH, entrypoint.sh changes that alter the DB, or any direct SQLite operations), **take a backup first**:
+
+```bash
+cp /data/track/data.db /data/track/data.db.bak-$(date +%Y%m%d-%H%M%S)
+```
+
+PocketBase can silently wipe field data when schema is patched without original field IDs. A backup takes one second and has saved data loss before.
+
 ## Current Status
 
 Fully deployed at `track.uleh.tv` on the uleh home server. Running behind Cloudflare Access (nginx reverse proxy → Docker Compose stack on port 3003). Debug instance runs on port 3002 from the local dev compose file.

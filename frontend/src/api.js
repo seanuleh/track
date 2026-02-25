@@ -23,12 +23,21 @@ export async function getEntries() {
   return records
 }
 
-export async function createEntry({ date, weight, notes }) {
-  return pb.collection('weight_entries').create({ date, weight, notes, user: pb.authStore.model.id })
+export async function createEntry({ date, weight, notes, medication, dose_mg }) {
+  return pb.collection('weight_entries').create({
+    date, weight, notes,
+    medication: medication || '',
+    dose_mg: dose_mg != null && medication ? Number(dose_mg) : null,
+    user: pb.authStore.model.id,
+  })
 }
 
-export async function updateEntry(id, { date, weight, notes }) {
-  return pb.collection('weight_entries').update(id, { date, weight, notes })
+export async function updateEntry(id, { date, weight, notes, medication, dose_mg }) {
+  return pb.collection('weight_entries').update(id, {
+    date, weight, notes,
+    medication: medication || '',
+    dose_mg: dose_mg != null && medication ? Number(dose_mg) : null,
+  })
 }
 
 export async function deleteEntry(id) {

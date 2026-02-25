@@ -318,6 +318,8 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
+  /* Use dvh so the overlay shrinks with the keyboard — modal stays pinned to visible bottom */
+  height: 100dvh;
   background: rgba(26, 32, 53, 0.4);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -337,25 +339,28 @@ body {
   background: var(--surface);
   border-radius: var(--radius) var(--radius) 0 0;
   border-top: 1px solid var(--border);
-  padding: 28px 24px 40px;
+  padding: 16px 18px 24px;
   width: 100%;
   max-width: 480px;
   box-shadow: var(--shadow-md);
-  animation: slideUp 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+  animation: modalFadeIn 0.15s ease-out;
 }
 
 @media (min-width: 600px) {
   .modal {
     border-radius: var(--radius);
     border: 1px solid var(--border);
-    padding: 32px;
+    padding: 24px;
     animation: fadeScale 0.2s ease-out;
+  }
+  .modal-overlay {
+    padding-bottom: 0 !important;
   }
 }
 
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes fadeScale {
@@ -367,9 +372,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border-light);
+}
+
+.modal-header--compact {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
 }
 
 .modal-title {
@@ -378,6 +388,10 @@ body {
   font-weight: 400;
   letter-spacing: -0.3px;
   color: var(--text);
+}
+
+.modal-title--compact {
+  font-size: 18px;
 }
 
 .modal-close {
@@ -399,17 +413,21 @@ body {
 }
 
 .form-group {
-  margin-bottom: 18px;
+  margin-bottom: 12px;
+}
+
+.form-group--compact {
+  margin-bottom: 10px;
 }
 
 .form-label {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--text-muted);
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 .form-input {
@@ -426,6 +444,12 @@ body {
   -webkit-appearance: none;
 }
 
+.form-input--compact {
+  padding: 9px 12px;
+  font-size: 15px;
+  border-radius: 8px;
+}
+
 .form-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -438,7 +462,15 @@ body {
 .modal-actions {
   display: flex;
   gap: 10px;
-  margin-top: 24px;
+  margin-top: 14px;
+}
+
+.modal-actions--compact {
+  margin-top: 12px;
+}
+
+.modal-actions--compact .btn {
+  padding: 10px;
 }
 
 .btn {
@@ -520,6 +552,72 @@ body {
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 300;
+}
+
+/* ── Medication badge on entry cards ─────── */
+.entry-med-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+
+/* Adjust padding for cards with left border */
+.entry-card[style*="border-left"] {
+  padding-left: 15px;
+}
+
+/* ── Chart legend ────────────────────────── */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 4px 12px 8px;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.chart-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Chart tooltip med line ──────────────── */
+.chart-tooltip-med {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 3px;
+  opacity: 0.9;
+}
+
+/* ── Form 2-column row ───────────────────── */
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-select {
+  cursor: pointer;
+}
+
+.form-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Infinite scroll sentinel ────────────── */

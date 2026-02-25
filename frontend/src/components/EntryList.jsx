@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { buildColorMap, getMedKey, formatMedLabel, NO_MED_COLOR } from '../medColors.js'
 
 const PAGE_SIZE = 20
 
@@ -28,7 +29,7 @@ function IconTrash() {
   )
 }
 
-function EntryCard({ entry, onEdit, onDelete }) {
+function EntryCard({ entry, medColor, onEdit, onDelete }) {
   const [actionsVisible, setActionsVisible] = useState(false)
   const cardRef = useRef(null)
 
@@ -44,10 +45,14 @@ function EntryCard({ entry, onEdit, onDelete }) {
     return () => document.removeEventListener('touchstart', handleOutside)
   }, [actionsVisible])
 
+  const hasMed = !!entry.medication
+  const medLabel = hasMed ? formatMedLabel(getMedKey(entry)) : null
+
   return (
     <div
       ref={cardRef}
       className={`entry-card${actionsVisible ? ' actions-visible' : ''}`}
+      style={hasMed ? { borderLeft: `3px solid ${medColor}` } : undefined}
       onTouchEnd={(e) => {
         // Only toggle if touch didn't land on a button
         if (e.target.closest('.icon-btn')) return
@@ -56,6 +61,9 @@ function EntryCard({ entry, onEdit, onDelete }) {
     >
       <div className="entry-meta">
         <div className="entry-date">{formatDate(entry.date)}</div>
+        {medLabel && (
+          <div className="entry-med-badge" style={{ color: medColor }}>{medLabel}</div>
+        )}
         {entry.notes && <div className="entry-notes">{entry.notes}</div>}
       </div>
       <div className="entry-weight">
@@ -73,7 +81,7 @@ function EntryCard({ entry, onEdit, onDelete }) {
   )
 }
 
-export default function EntryList({ entries, onEdit, onDelete }) {
+export default function EntryList({ entries, onEdit, onDelete, colorMap }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const sentinelRef = useRef(null)
 
@@ -105,7 +113,13 @@ export default function EntryList({ entries, onEdit, onDelete }) {
     <>
       <div className="entry-list">
         {visible.map(entry => (
-          <EntryCard key={entry.id} entry={entry} onEdit={onEdit} onDelete={onDelete} />
+          <EntryCard
+            key={entry.id}
+            entry={entry}
+            medColor={(colorMap && colorMap[getMedKey(entry)]) ?? NO_MED_COLOR}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         ))}
       </div>
       {hasMore && <div ref={sentinelRef} className="load-more-sentinel" />}

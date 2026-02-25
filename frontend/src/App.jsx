@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { initAuth, getEntries, deleteEntry } from './api.js'
 import WeightChart from './components/WeightChart.jsx'
 import EntryList from './components/EntryList.jsx'
 import AddEditModal from './components/AddEditModal.jsx'
 import FAB from './components/FAB.jsx'
+import { buildColorMap } from './medColors.js'
 
 const WINDOWS = [
   { label: '1W', days: 7 },
@@ -61,6 +62,8 @@ export default function App() {
     }
     init()
   }, [load])
+
+  const colorMap = useMemo(() => buildColorMap(entries), [entries])
 
   const selectedWindow = WINDOWS.find(w => w.label === window_)
   const filtered = filterByWindow(entries, selectedWindow?.days)
@@ -140,7 +143,7 @@ export default function App() {
       </div>
 
       <div className="chart-card">
-        <WeightChart data={chartData} />
+        <WeightChart data={chartData} allEntries={entries} />
       </div>
 
       <div>
@@ -149,6 +152,7 @@ export default function App() {
           entries={filtered.filter(e => !e._anchor)}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          colorMap={colorMap}
         />
         {filtered.length === 0 && (
           <div className="empty">No entries in this period.</div>
@@ -160,6 +164,9 @@ export default function App() {
       {modalOpen && (
         <AddEditModal
           entry={editEntry}
+          lastWeight={entries.length > 0 ? String(entries[0].weight) : ''}
+          lastMedication={entries.length > 0 ? (entries[0].medication || '') : ''}
+          lastDose={entries.length > 0 ? entries[0].dose_mg : null}
           onSave={handleSave}
           onClose={() => { setModalOpen(false); setEditEntry(null) }}
         />
