@@ -1,12 +1,12 @@
 import PocketBase from 'pocketbase'
 
-const pb = new PocketBase('/pb')
+const pb = new PocketBase('/')
 pb.autoCancellation(false)
 
 let authToken = null
 
 export async function initAuth() {
-  const res = await fetch('/pb/api/cf-auth', { method: 'POST' })
+  const res = await fetch('/api/cf-auth', { method: 'POST' })
   if (!res.ok) {
     throw new Error(`CF auth failed: ${res.status} ${await res.text()}`)
   }

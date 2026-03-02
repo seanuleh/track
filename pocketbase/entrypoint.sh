@@ -7,7 +7,7 @@ DATA_DIR="/pb/pb_data"
 echo "Starting PocketBase init..."
 
 # Start PocketBase in background
-$PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" &
+$PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public" --hooksDir="/pb/pb_hooks" &
 PB_PID=$!
 
 # Wait for PocketBase to be ready
@@ -35,6 +35,15 @@ AUTH_RESP=$(wget -q -O - --post-data="{\"identity\":\"${PB_ADMIN_EMAIL}\",\"pass
 
 TOKEN=$(echo "$AUTH_RESP" | sed 's/.*"token":"\([^"]*\)".*/\1/')
 echo "Got token: ${TOKEN:0:20}..."
+
+# Configure trusted proxy headers so PB uses X-Forwarded-For from nginx
+echo "Configuring trusted proxy headers..."
+wget -q -O - \
+  --method=PATCH \
+  --header="Content-Type: application/json" \
+  --header="Authorization: ${TOKEN}" \
+  --body-data='{"trustedProxy":{"headers":["X-Forwarded-For"]}}' \
+  http://localhost:8090/api/settings 2>&1 | head -c 120 || true
 
 # Create users auth collection (no-op if exists)
 # Users are created on-demand by the cf_auth hook — no static accounts needed.
@@ -117,4 +126,4 @@ kill $PB_PID
 wait $PB_PID 2>/dev/null || true
 
 echo "Init complete. Starting PocketBase in foreground..."
-exec $PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR"
+exec $PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public" --hooksDir="/pb/pb_hooks"
