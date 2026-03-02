@@ -33,8 +33,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Don't precache fonts (loaded from Google Fonts CDN)
-        globIgnores: ['**/fonts/**'],
+        // Don't precache app shell — nginx handles JS/CSS via hashed filenames + no-cache on index.html
+        // Precaching bypasses nginx cache headers and causes stale JS after deploys
+        globPatterns: [],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
