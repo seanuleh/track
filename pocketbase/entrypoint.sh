@@ -7,7 +7,7 @@ DATA_DIR="/pb/pb_data"
 echo "Starting PocketBase init..."
 
 # Start PocketBase in background
-$PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public" --hooksDir="/pb/pb_hooks" &
+$PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public" &
 PB_PID=$!
 
 # Wait for PocketBase to be ready
@@ -126,4 +126,4 @@ kill $PB_PID
 wait $PB_PID 2>/dev/null || true
 
 echo "Init complete. Starting PocketBase in foreground..."
-exec $PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public" --hooksDir="/pb/pb_hooks"
+exec $PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public"

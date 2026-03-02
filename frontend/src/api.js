@@ -3,19 +3,6 @@ import PocketBase from 'pocketbase'
 const pb = new PocketBase('/')
 pb.autoCancellation(false)
 
-let authToken = null
-
-export async function initAuth() {
-  const res = await fetch('/api/cf-auth', { method: 'POST' })
-  if (!res.ok) {
-    throw new Error(`CF auth failed: ${res.status} ${await res.text()}`)
-  }
-  const data = await res.json()
-  authToken = data.token
-  pb.authStore.save(authToken, data.record)
-  return authToken
-}
-
 export async function getEntries() {
   const records = await pb.collection('weight_entries').getFullList({
     sort: '-date',

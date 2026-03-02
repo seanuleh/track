@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { initAuth, getEntries, deleteEntry } from './api.js'
+import { getEntries, deleteEntry } from './api.js'
 import WeightChart from './components/WeightChart.jsx'
 import EntryList from './components/EntryList.jsx'
 import AddEditModal from './components/AddEditModal.jsx'
@@ -52,7 +52,6 @@ export default function App() {
   useEffect(() => {
     async function init() {
       try {
-        await initAuth()
         await load()
       } catch (err) {
         setError(err.message)
