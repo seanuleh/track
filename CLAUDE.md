@@ -5,7 +5,8 @@ Self-hosted Docker weight tracking app. React SPA + PocketBase backend. Units: *
 ## ⚠️ Always Back Up Before Schema Changes
 
 ```bash
-cp /data/track/data.db /data/track/data.db.bak-$(date +%Y%m%d-%H%M%S)
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+tar -czf /data/track/backups/${TIMESTAMP}.tar.gz -C /data/track --exclude=backups --exclude=storage .
 ```
 
 PocketBase silently wipes field data when schema is patched without original field IDs.

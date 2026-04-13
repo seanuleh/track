@@ -9,7 +9,10 @@
       "Bash(python3:*)",
       "Bash(tail:*)",
       "Bash(docker exec:*)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Read(//home/sean/.claude/skills/**)",
+      "Bash(cat /home/sean/.claude/skills/new-pb-app/*.md)",
+      "Bash(cat /home/sean/.claude/skills/new-pb-app/*)"
     ]
   }
 }
