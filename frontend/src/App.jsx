@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { getEntries, deleteEntry } from './api.js'
-import WeightChart from './components/WeightChart.jsx'
+import WeightChart, { getLegendKeys } from './components/WeightChart.jsx'
 import EntryList from './components/EntryList.jsx'
 import AddEditModal from './components/AddEditModal.jsx'
 import FAB from './components/FAB.jsx'
-import { buildColorMap } from './medColors.js'
+import { buildColorMap, formatMedLabel, NO_MED_COLOR } from './medColors.js'
 
 const WINDOWS = [
   { label: '1W', days: 7 },
@@ -29,6 +29,66 @@ function filterByWindow(entries, days) {
     return [{ ...before[0], date: cutoffStr, _anchor: true }, ...inRange]
   }
   return inRange
+}
+
+
+function chartHeightForData(data) {
+  if (data.length < 2) return 180
+  const minTs = new Date(data[0].date).getTime()
+  const maxTs = new Date(data[data.length - 1].date).getTime()
+  const spanDays = (maxTs - minTs) / 86400000
+  if (spanDays <= 14) return 180
+  if (spanDays <= 90) return 220
+  if (spanDays <= 365) return 260
+  return 300
+}
+
+function ChartCrossfade({ chartData, entries }) {
+  const [current, setCurrent] = useState({ key: 0, data: chartData, allEntries: entries })
+  const [prev, setPrev] = useState(null)
+  const timerRef = useRef(null)
+  const initRef = useRef(true)
+
+  useEffect(() => {
+    if (initRef.current) { initRef.current = false; return }
+    clearTimeout(timerRef.current)
+    setPrev({ ...current, fading: true })
+    const nextKey = current.key + 1
+    setCurrent({ key: nextKey, data: chartData, allEntries: entries })
+    timerRef.current = setTimeout(() => setPrev(null), 450)
+    return () => clearTimeout(timerRef.current)
+  }, [chartData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const targetHeight = chartHeightForData(chartData)
+  const prevHeight = prev ? chartHeightForData(prev.data) : targetHeight
+  const containerHeight = Math.max(targetHeight, prevHeight)
+
+  const { keys: legendKeys, colorMap: legendColorMap } = getLegendKeys(current.data, current.allEntries)
+
+  return (
+    <div>
+      <div style={{ position: 'relative', height: containerHeight, transition: 'height 0.4s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
+        {prev && (
+          <div style={{ position: 'absolute', inset: 0, opacity: 0, transition: 'opacity 0.25s ease', pointerEvents: 'none' }}>
+            <WeightChart key={prev.key} data={prev.data} allEntries={prev.allEntries} />
+          </div>
+        )}
+        <div style={{ position: 'absolute', inset: 0, opacity: 1, transition: 'opacity 0.25s ease 0.1s' }}>
+          <WeightChart key={current.key} data={current.data} allEntries={current.allEntries} />
+        </div>
+      </div>
+      {legendKeys.length > 0 && (
+        <div className="chart-legend">
+          {legendKeys.map(key => (
+            <span key={key} className="chart-legend-item">
+              <span className="chart-legend-dot" style={{ background: legendColorMap[key] ?? NO_MED_COLOR }} />
+              {formatMedLabel(key)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function App() {
@@ -63,6 +123,19 @@ export default function App() {
   }, [load])
 
   const colorMap = useMemo(() => buildColorMap(entries), [entries])
+
+  const pillsRef = useRef(null)
+  const pillRefs = useRef({})
+  const [indicator, setIndicator] = useState(null)
+
+  useEffect(() => {
+    const container = pillsRef.current
+    const activeEl = pillRefs.current[window_]
+    if (!container || !activeEl) return
+    const cRect = container.getBoundingClientRect()
+    const aRect = activeEl.getBoundingClientRect()
+    setIndicator({ left: aRect.left - cRect.left, width: aRect.width })
+  }, [window_, loading])
 
   const selectedWindow = WINDOWS.find(w => w.label === window_)
   const filtered = filterByWindow(entries, selectedWindow?.days)
@@ -129,10 +202,12 @@ export default function App() {
         </div>
       </div>
 
-      <div className="window-pills">
+      <div className="window-pills" ref={pillsRef}>
+        <div className="pill-indicator" style={indicator ? { left: indicator.left, width: indicator.width } : { transition: 'none', left: 0, width: 0 }} />
         {WINDOWS.map(w => (
           <button
             key={w.label}
+            ref={el => { pillRefs.current[w.label] = el }}
             className={`pill${window_ === w.label ? ' active' : ''}`}
             onClick={() => { setWindow_(w.label); localStorage.setItem('weightWindow', w.label) }}
           >
@@ -142,7 +217,7 @@ export default function App() {
       </div>
 
       <div className="chart-card">
-        <WeightChart data={chartData} allEntries={entries} />
+        <ChartCrossfade chartData={chartData} entries={entries} />
       </div>
 
       <div>

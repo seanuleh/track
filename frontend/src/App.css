@@ -24,6 +24,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
@@ -130,6 +131,7 @@ body {
 
 /* ── Window pills ────────────────────────── */
 .window-pills {
+  position: relative;
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
@@ -139,7 +141,20 @@ body {
   margin-bottom: 12px;
 }
 
+.pill-indicator {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 10px;
+  background: var(--accent);
+  transition: left 0.22s cubic-bezier(0.4, 0, 0.2, 1), width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .pill {
+  position: relative;
+  z-index: 1;
   flex: 1;
   background: none;
   border: none;
@@ -151,18 +166,16 @@ body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s;
   border-radius: 10px;
 }
 
 .pill:hover {
   color: var(--text);
-  background: var(--surface2);
 }
 
 .pill.active {
   color: var(--surface);
-  background: var(--accent);
 }
 
 /* ── Chart card ──────────────────────────── */

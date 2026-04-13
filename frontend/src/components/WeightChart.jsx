@@ -109,10 +109,25 @@ function yAxisWidth(maxW) {
   return 12 + String(maxW.toFixed(1)).length * 7
 }
 
+function chartHeight(spanDays) {
+  if (spanDays === 0) return 180
+  if (spanDays <= 14) return 180
+  if (spanDays <= 90) return 220
+  if (spanDays <= 365) return 260
+  return 300
+}
+
+export function getLegendKeys(data, allEntries) {
+  const colorMap = buildColorMap(allEntries.length > 0 ? allEntries : data)
+  const keys = [...new Set(data.map(d => getMedKey(d)))].filter(k => !!k)
+  return { keys, colorMap }
+}
+
 export default function WeightChart({ data, allEntries = [] }) {
+
   if (data.length === 0) {
     return (
-      <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 15, fontStyle: 'italic', fontFamily: 'var(--font-display)' }}>
+      <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 15, fontStyle: 'italic', fontFamily: 'var(--font-display)' }}>
         No data to display
       </div>
     )
@@ -134,6 +149,7 @@ export default function WeightChart({ data, allEntries = [] }) {
   const minTs = tsData[0].ts
   const maxTs = tsData[tsData.length - 1].ts
   const spanDays = (maxTs - minTs) / 86400000
+  const height = chartHeight(spanDays)
 
   const ticks = generateTicks(minTs, maxTs, spanDays).filter(t => t >= minTs && t <= maxTs)
   const leftWidth = yAxisWidth(maxW + pad)
@@ -145,7 +161,7 @@ export default function WeightChart({ data, allEntries = [] }) {
   // Legend: unique medication keys present in this window
   const legendKeys = [...new Set(tsData.map(d => d._medKey))].filter(k => !!k)
 
-  const showDots = data.length <= 30
+  const showDots = spanDays <= 14
 
   function MedDot({ cx, cy, payload }) {
     if (cx == null || cy == null) return null
@@ -155,7 +171,7 @@ export default function WeightChart({ data, allEntries = [] }) {
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={tsData} margin={{ top: 8, right: 4, left: -(40 - leftWidth), bottom: 0 }}>
           <defs>
             <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
@@ -203,21 +219,13 @@ export default function WeightChart({ data, allEntries = [] }) {
               const color = colorMap[props.payload?._medKey] ?? LINE_COLOR
               return <circle cx={props.cx} cy={props.cy} r={5} fill={color} stroke="#f2f4f7" strokeWidth={2} />
             }}
-            isAnimationActive={false}
+            isAnimationActive={true}
+            animationDuration={400}
+            animationEasing="ease-out"
           />
         </AreaChart>
       </ResponsiveContainer>
 
-      {legendKeys.length > 0 && (
-        <div className="chart-legend">
-          {legendKeys.map(key => (
-            <span key={key} className="chart-legend-item">
-              <span className="chart-legend-dot" style={{ background: colorMap[key] ?? NO_MED_COLOR }} />
-              {formatMedLabel(key)}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
