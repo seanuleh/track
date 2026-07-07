@@ -36,6 +36,7 @@ export default defineConfig({
         // Don't precache app shell — nginx handles JS/CSS via hashed filenames + no-cache on index.html
         // Precaching bypasses nginx cache headers and causes stale JS after deploys
         globPatterns: [],
+        navigateFallback: null,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
