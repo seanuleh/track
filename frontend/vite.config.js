@@ -33,9 +33,13 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Don't precache app shell — nginx handles JS/CSS via hashed filenames + no-cache on index.html
-        // Precaching bypasses nginx cache headers and causes stale JS after deploys
-        globPatterns: [],
+        // Precache the content-hashed bundle (JS/CSS/fonts/icons) so the app shell paints
+        // instantly on launch. Safe because Vite hashes these filenames → immutable; a deploy
+        // produces new names + a new precache manifest (autoUpdate + skipWaiting swaps it in).
+        // index.html is deliberately NOT precached: it must stay network-live so nginx can
+        // inject the per-request cf-auth sub_filter script. navigateFallback:null keeps every
+        // navigation on the network (see cfAuth Lesson #9 — cached HTML causes a login loop).
+        globPatterns: ['**/*.{js,css,woff2,woff,png,svg}'],
         navigateFallback: null,
         runtimeCaching: [
           {
