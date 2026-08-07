@@ -1,12 +1,16 @@
 #!/bin/sh
 set -e
 
+# Admin bootstrap only. All schema lives in pb_migrations/ and is applied by
+# PocketBase on startup — never create or PATCH collections here, since this
+# script runs on every container restart and would scramble field IDs.
+
 PB_BIN="/pb/pocketbase"
 DATA_DIR="/pb/pb_data"
 
 echo "Starting PocketBase init..."
 
-# Start PocketBase in background
+# Start PocketBase in background (this also applies any pending migrations)
 $PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public" &
 PB_PID=$!
 
@@ -45,85 +49,12 @@ wget -q -O - \
   --body-data='{"trustedProxy":{"headers":["X-Forwarded-For"]}}' \
   http://localhost:8090/api/settings 2>&1 | head -c 120 || true
 
-# Create users auth collection (no-op if exists)
-# Users are created on-demand by the cf_auth hook — no static accounts needed.
-echo "Creating users auth collection..."
-USERS_COLLECTION_PAYLOAD='{
-  "name": "users",
-  "type": "auth",
-  "schema": [],
-  "listRule": "@request.auth.id != \"\"",
-  "viewRule": "@request.auth.id != \"\"",
-  "createRule": null,
-  "updateRule": "@request.auth.id = id",
-  "deleteRule": null
-}'
-USERS_COLL_RESP=$(wget -q -O - --post-data="$USERS_COLLECTION_PAYLOAD" \
-  --header="Content-Type: application/json" \
-  --header="Authorization: ${TOKEN}" \
-  http://localhost:8090/api/collections 2>&1 || true)
-echo "Users collection create response: $USERS_COLL_RESP"
-
-# Create weight_entries collection (no-op if exists)
-echo "Creating weight_entries collection..."
-COLLECTION_PAYLOAD='{
-  "name": "weight_entries",
-  "type": "base",
-  "schema": [
-    {
-      "name": "date",
-      "type": "text",
-      "required": true,
-      "options": {}
-    },
-    {
-      "name": "weight",
-      "type": "number",
-      "required": true,
-      "options": {"min": 0, "max": null}
-    },
-    {
-      "name": "notes",
-      "type": "text",
-      "required": false,
-      "options": {}
-    },
-    {
-      "name": "medication",
-      "type": "text",
-      "required": false,
-      "options": {}
-    },
-    {
-      "name": "dose_mg",
-      "type": "number",
-      "required": false,
-      "options": {"min": 0, "max": null}
-    },
-    {
-      "name": "user",
-      "type": "relation",
-      "required": true,
-      "options": {"collectionId": "_pb_users_auth_", "cascadeDelete": false, "minSelect": null, "maxSelect": 1, "displayFields": []}
-    }
-  ],
-  "listRule": "@request.auth.id = user",
-  "viewRule": "@request.auth.id = user",
-  "createRule": "@request.auth.id != \"\"",
-  "updateRule": "@request.auth.id = user",
-  "deleteRule": "@request.auth.id = user"
-}'
-
-COLL_RESP=$(wget -q -O - --post-data="$COLLECTION_PAYLOAD" \
-  --header="Content-Type: application/json" \
-  --header="Authorization: ${TOKEN}" \
-  http://localhost:8090/api/collections 2>&1 || true)
-echo "Collection create response: $COLL_RESP"
-
 # Stop background PocketBase
 echo "Stopping background PocketBase..."
 kill $PB_PID
 wait $PB_PID 2>/dev/null || true
+
+if [ "$1" = "--init-only" ]; then exit 0; fi
 
 echo "Init complete. Starting PocketBase in foreground..."
 exec $PB_BIN serve --http=0.0.0.0:8090 --dir="$DATA_DIR" --publicDir="/pb/pb_public"
