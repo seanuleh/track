@@ -103,7 +103,29 @@ a bare number, which is where the remaining/over figure belongs.
 Consider deriving a suggested target from the weight trend — the weight data is right
 there in the same database, which is the whole reason for putting food in this app.
 
-### 5. Copy meals/foods to another day
+### 5. Serving units — **unplanned, but now the most pressing gap**
+
+Surfaced while importing a real Cronometer day (2026-08-07). Most items were
+unit-based — "1 Pack", "3 wrap", "0.5 each", "2 cookie" — with **no gram weight on
+the label**. `foods` stores per 100 g and `food_logs` stores grams, so there was
+nowhere to put them.
+
+The import worked around it with the convention **100 g == 1 natural unit** of that
+food (per wrap, per cookie, per pack): the per-unit kcal goes in `kcal`, and the log
+records `units * 100` grams. Totals come out exact, but the gram figures are fictional
+— "300 g" of mini wraps means three wraps.
+
+Affected records are tagged: `source: 'manual'` with a `raw.basis` string spelling out
+which basis was used, and `raw.imported_from: 'cronometer'`. They can be found and
+migrated later.
+
+The real fix is a unit on `foods` — something like `unit_label` plus `unit_g` (null
+when the unit has no gram equivalent) — and letting `food_logs` record either grams or
+units. Do this **before** the food database grows, because every workaround record
+above will need rewriting, and the local cache is the thing that makes the app worth
+using.
+
+### 6. Copy meals/foods to another day
 
 Nothing exists. Cheapest useful version: on the day view, "copy this meal to today",
 creating fresh `food_logs` rows with a new `date`. Everything needed is already in the
@@ -120,6 +142,13 @@ use — people eat the same things repeatedly.
 Infrastructure and PocketBase gotchas are in `CLAUDE.md` and `~/docs/track.md`. These
 are the food-specific ones:
 
+- **`json` fields need an explicit `maxSize`.** Creating one with `options: {}` stores
+  `maxSize: 0`, and 0 means *reject everything*, not *no limit*. Writes fail with
+  `validation_json_size_limit: The maximum allowed JSON size is 0 bytes`. This shipped
+  broken and silently disabled OFF caching (`foods.raw`) and all recipe saves
+  (`recipes.items`) until `1786113033_json_field_max_size.js` fixed it. It went
+  unnoticed because the end-to-end test had `raw` stripped from its payload — **test
+  the json fields with actual content.**
 - **Macros are stored per 100 g. Always.** Every source normalises to that basis on
   ingestion, so a serving is one multiply (`macrosFor`). Don't introduce per-serving
   storage — it forces a unit check at every call site.
