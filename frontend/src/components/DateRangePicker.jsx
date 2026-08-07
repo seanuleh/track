@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
+import { today } from '../dates.js'
 
 export default function DateRangePicker({ startDate, endDate, onApply, onClose }) {
   const [start, setStart] = useState(startDate || '')

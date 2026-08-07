@@ -5,6 +5,7 @@ import EntryList from './components/EntryList.jsx'
 import AddEditModal from './components/AddEditModal.jsx'
 import FAB from './components/FAB.jsx'
 import FoodView from './components/FoodView.jsx'
+import { toLocalISO } from './dates.js'
 import { buildColorMap, formatMedLabel, NO_MED_COLOR } from './medColors.js'
 
 const WINDOWS = [
@@ -22,7 +23,7 @@ function filterByWindow(entries, days) {
   if (!days) return entries
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - days)
-  const cutoffStr = cutoff.toISOString().slice(0, 10)
+  const cutoffStr = toLocalISO(cutoff)
   const inRange = entries.filter(e => e.date >= cutoffStr)
   const before = entries.filter(e => e.date < cutoffStr)
   // Pin the anchor point to the cutoff date so the line starts exactly at the left edge

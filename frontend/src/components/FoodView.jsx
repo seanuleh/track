@@ -2,14 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getLogsForDate, deleteLog, resolveBarcode, searchFoods, macrosFor, totalMacros } from '../food/api.js'
 import Scanner from './Scanner.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
-
-const today = () => new Date().toISOString().slice(0, 10)
-
-function shiftDate(date, days) {
-  const d = new Date(date + 'T00:00:00')
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
+import { today, shiftDate } from '../dates.js'
 
 const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
 
