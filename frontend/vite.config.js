@@ -40,6 +40,11 @@ export default defineConfig({
         // inject the per-request cf-auth sub_filter script. navigateFallback:null keeps every
         // navigation on the network (see cfAuth Lesson #9 — cached HTML causes a login loop).
         globPatterns: ['**/*.{js,css,woff2,woff,png,svg}'],
+        // The ZXing barcode decoder is a lazy-loaded fallback for browsers
+        // without the native BarcodeDetector API. On Chrome for Android — the
+        // device this actually runs on — it is never fetched, so precaching it
+        // would add ~170 kB gzip to every install for nothing.
+        globIgnores: ['**/zxing-*.js'],
         navigateFallback: null,
         runtimeCaching: [
           {
@@ -54,6 +59,17 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Give the ZXing chunk a stable name so the service worker can exclude
+        // it from the precache by glob (see globIgnores above).
+        manualChunks(id) {
+          if (id.includes('@zxing')) return 'zxing'
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {

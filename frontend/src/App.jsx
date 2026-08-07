@@ -4,6 +4,7 @@ import WeightChart, { getLegendKeys } from './components/WeightChart.jsx'
 import EntryList from './components/EntryList.jsx'
 import AddEditModal from './components/AddEditModal.jsx'
 import FAB from './components/FAB.jsx'
+import FoodView from './components/FoodView.jsx'
 import { buildColorMap, formatMedLabel, NO_MED_COLOR } from './medColors.js'
 
 const WINDOWS = [
@@ -91,7 +92,7 @@ function ChartCrossfade({ chartData, entries }) {
   )
 }
 
-export default function App() {
+function WeightView() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -245,6 +246,150 @@ export default function App() {
           onClose={() => { setModalOpen(false); setEditEntry(null) }}
         />
       )}
+    </>
+  )
+}
+
+const TABS = [
+  { key: 'food', label: 'Food' },
+  { key: 'weight', label: 'Weight' },
+]
+
+// Horizontal travel (px) before a gesture counts as a tab swipe, and how much
+// more horizontal than vertical it must be. The ratio is what stops an ordinary
+// diagonal scroll down the history list from flipping tabs.
+const SWIPE_MIN_X = 60
+const SWIPE_RATIO = 1.5
+
+// A swipe that starts inside one of these is meant for that element, not the
+// tab strip: the scanner and modals sit above the page, and the search results
+// are their own scrollable list.
+const SWIPE_EXEMPT = '.scanner-overlay, .modal-overlay, .search-results'
+
+// How far past SWIPE_MIN_X a gesture must get before the pill bar is revealed.
+// Lower than the commit threshold so the bar shows up as confirmation while the
+// finger is still moving, rather than only after the tab has already changed.
+const SWIPE_HINT_X = 24
+
+// How long the pill bar lingers after a swipe settles.
+const BAR_LINGER_MS = 1600
+
+export default function App() {
+  // Storage key is versioned: v1 predates Food existing, so honouring a stale
+  // 'weight' from it would hide the new default from anyone who'd used the app.
+  const [tab, setTab] = useState(() => localStorage.getItem('trackTab.v2') || 'food')
+  const [slide, setSlide] = useState(null)
+  const [barVisible, setBarVisible] = useState(false)
+
+  const touchRef = useRef(null)
+  const barTimerRef = useRef(null)
+
+  const index = TABS.findIndex(t => t.key === tab)
+
+  // Show the pill bar, then fade it out again once the gesture has settled.
+  const flashBar = useCallback((linger = BAR_LINGER_MS) => {
+    setBarVisible(true)
+    clearTimeout(barTimerRef.current)
+    barTimerRef.current = setTimeout(() => setBarVisible(false), linger)
+  }, [])
+
+  const selectTab = useCallback((key, direction = null) => {
+    setTab(key)
+    setSlide(direction)
+    localStorage.setItem('trackTab.v2', key)
+    flashBar()
+  }, [flashBar])
+
+  useEffect(() => () => clearTimeout(barTimerRef.current), [])
+
+  // Listeners live on the document, not the tab panel. The panel is only as
+  // tall as its content, so anything attached there silently stops working
+  // below the last card — which is most of the screen on a short day's log.
+  useEffect(() => {
+    function onTouchStart(e) {
+      if (e.target.closest(SWIPE_EXEMPT)) { touchRef.current = null; return }
+      const t = e.changedTouches[0]
+      touchRef.current = { x: t.clientX, y: t.clientY, hinted: false }
+    }
+
+    function onTouchMove(e) {
+      const start = touchRef.current
+      if (!start || start.hinted) return
+
+      const t = e.changedTouches[0]
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+
+      // Only reveal the bar once the gesture actually looks horizontal,
+      // otherwise it would flash on every vertical scroll.
+      if (Math.abs(dx) > SWIPE_HINT_X && Math.abs(dx) > Math.abs(dy) * SWIPE_RATIO) {
+        start.hinted = true
+        flashBar()
+      }
+    }
+
+    function onTouchEnd(e) {
+      const start = touchRef.current
+      touchRef.current = null
+      if (!start) return
+
+      const t = e.changedTouches[0]
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+
+      if (Math.abs(dx) < SWIPE_MIN_X) return
+      if (Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return
+
+      // Swiping left drags the next tab in from the right, and vice versa.
+      // The index wraps, so a swipe at either end carries on round rather than
+      // dying against the edge.
+      const step = dx < 0 ? 1 : -1
+      const next = TABS[(index + step + TABS.length) % TABS.length]
+      selectTab(next.key, step > 0 ? 'left' : 'right')
+    }
+
+    // Passive: the handlers never preventDefault, and marking them so keeps
+    // vertical scrolling smooth.
+    const opts = { passive: true }
+    document.addEventListener('touchstart', onTouchStart, opts)
+    document.addEventListener('touchmove', onTouchMove, opts)
+    document.addEventListener('touchend', onTouchEnd, opts)
+    document.addEventListener('touchcancel', onTouchEnd, opts)
+
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+      document.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [index, selectTab, flashBar])
+
+  return (
+    <>
+      <div
+        className={slide ? `tab-panel slide-${slide}` : 'tab-panel'}
+        // `key` restarts the slide animation on every change, including a
+        // repeat swipe in the same direction.
+        key={tab}
+      >
+        {tab === 'weight' ? <WeightView /> : <FoodView />}
+      </div>
+
+      <nav
+        className={`tab-bar${barVisible ? ' visible' : ''}`}
+        // Keep the bar up while it's being used, so it can't fade mid-tap.
+        onPointerEnter={() => flashBar()}
+      >
+        {TABS.map((t, i) => (
+          <button
+            key={t.key}
+            className={`tab${tab === t.key ? ' active' : ''}`}
+            onClick={() => selectTab(t.key, i > index ? 'left' : i < index ? 'right' : null)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
     </>
   )
 }

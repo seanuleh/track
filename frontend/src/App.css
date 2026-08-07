@@ -38,6 +38,9 @@ body {
   font-family: var(--font-body);
   font-weight: 400;
   min-height: 100dvh;
+  /* Stop a horizontal swipe near the screen edge from being consumed by the
+     browser's back-navigation gesture instead of switching tabs. */
+  overscroll-behavior-x: contain;
 }
 
 #root {
@@ -647,4 +650,364 @@ body {
   background: rgba(201, 42, 42, 0.06);
   border-radius: 8px;
   border: 1px solid rgba(201, 42, 42, 0.15);
+}
+
+/* ── Tab bar ─────────────────────────────── */
+/* Hidden at rest — the bar is a transient confirmation of a swipe, revealed by
+   `.visible` while the gesture is in flight and for a moment afterwards. */
+.tab-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%) translateY(8px);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.tab-bar.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Swiping is touch-only, so on a mouse-driven browser the bar is the sole way
+   to change tabs — it has to stay put there. */
+@media (hover: hover) and (pointer: fine) {
+  .tab-bar {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  padding: 10px 28px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* The tab bar is hidden at rest, so the FAB sits at its natural height and only
+   shares the bottom edge with the bar during the brief moments it's shown. */
+.fab {
+  bottom: 24px;
+}
+
+/* ── Food view ───────────────────────────── */
+.macro-row {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.macro-row strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.date-nav button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.date-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.food-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.food-actions .btn {
+  flex: 1;
+}
+
+.food-search {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  z-index: 30;
+}
+
+.search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.search-result:last-child {
+  border-bottom: none;
+}
+
+.search-result:hover {
+  background: var(--surface2);
+}
+
+.sr-name {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.sr-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.food-status {
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--success);
+  background: rgba(26, 127, 90, 0.07);
+  border: 1px solid rgba(26, 127, 90, 0.16);
+  border-radius: 8px;
+}
+
+.food-hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.log-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.log-name {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.log-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.log-kcal {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ── Meal pills + macro preview ──────────── */
+.meal-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.meal-pill {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: capitalize;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.meal-pill.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.macro-preview {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  margin: 4px 0 16px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+}
+
+.macro-preview div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.macro-preview strong {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.macro-preview span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Scanner ─────────────────────────────── */
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.scanner-frame {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.scanner-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Guide box — purely visual; the decoder reads the whole frame. */
+.scanner-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 72%;
+  height: 34%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+}
+
+.scanner-hint {
+  color: #fff;
+  font-size: 15px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.scanner-subhint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.scanner-close {
+  padding: 12px 36px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ── Tab panel swipe transitions ─────────── */
+/* Direction is named for where the incoming panel travels: swiping left pulls
+   the next tab in from the right edge. */
+.tab-panel.slide-left {
+  animation: tab-slide-left 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.tab-panel.slide-right {
+  animation: tab-slide-right 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes tab-slide-left {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes tab-slide-right {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-panel.slide-left,
+  .tab-panel.slide-right {
+    animation: none;
+  }
 }
