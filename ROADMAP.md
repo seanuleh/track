@@ -1,10 +1,12 @@
 # Calorie tracking — roadmap & handoff
 
 Written 2026-08-08, at the end of the session that added food tracking to the weight
-tracker. Read this **and** `CLAUDE.md` before extending the food side.
+tracker, and updated the same day with the design decisions from the follow-up
+discussion. Read this **and** `CLAUDE.md` before extending the food side.
 
-`CLAUDE.md` describes what the app *is*. This file describes what it *isn't yet*, and
-the things that were learned the hard way so they don't get rediscovered.
+`CLAUDE.md` describes what the app *is*. This file describes what it *isn't yet*, the
+decisions already taken (with reasons, so they aren't silently reversed), and the
+things learned the hard way so they aren't rediscovered.
 
 ---
 
@@ -19,39 +21,116 @@ Shipped and working end-to-end:
 - Write-through cache: cache hit → OFF → manual entry, each miss saved to `foods`
 - Day view with per-meal grouping, macro totals, delete-on-tap
 - Food/Weight tabs, swipe with wrap-around, auto-hiding pill bar
+- One real day imported from Cronometer (2026-08-07, 10 items, 1644.5 kcal)
 
-**Verified**: 600 ml Powerade → 150 kcal / 34.8 g carbs, through the real PB path.
-**Not verified**: the camera. Nobody has scanned a physical barcode with this yet.
-The first real scanning session is also the only way to get a true AU hit rate —
-every coverage figure discussed so far was guessed barcodes and is worthless.
+**Verified**: the full OFF → `foods` → `food_logs` → totals path, against the live DB.
+**Not verified**: the camera. Nobody has scanned a physical barcode with this yet. The
+first real scanning session is also the only way to get a true AU hit rate — every
+coverage figure discussed so far came from guessed barcodes and is worthless.
 
 ---
 
-## Requested features
+## Architecture decisions
 
-Listed in the order I'd build them: each one leans on the ones above it.
+Taken deliberately. Reverse them only with a reason better than "it seemed simpler".
 
-### 1. Meal categories — **mostly already done**
+### Diary and Foods are separate surfaces
 
-Don't rebuild this from scratch; check what's there first.
+What exists today is a **diary**: date-scoped, touched many times a day, entries are
+disposable. What's being built next is a **library**: date-less, browsed and curated,
+durable definitions that the diary references. Opposite shapes — cramming a
+search-and-manage surface into a day view fights both.
 
-Already working: `meal` field on `food_logs`; `MEALS` constant and selectable meal
-pills in `FoodEntryModal`; `defaultMeal()` guesses from the clock so the common case
-needs no taps; `FoodView` groups the day's log under `MEAL_ORDER` headings.
+Target nav: **Diary, Foods, Weight**, Diary default.
 
-Genuinely missing:
-- Per-meal subtotals (currently only a day total)
-- Reordering / moving an entry to another meal after logging
-- The meal set is hard-coded in two files — `MEALS` in `FoodEntryModal.jsx` and
-  `MEAL_ORDER` in `FoodView.jsx`. If it becomes user-configurable, unify them first.
-- Logs with an empty `meal` are bucketed into `snack` by the view. If that matters,
-  make it explicit rather than a fallback.
+The Foods tab is a **manager** — browse, edit, curate, fix bad macros, build recipes.
+It deliberately carries *no* daily-logging burden. Logging is launched from the diary.
 
-### 2. Searching food databases
+### The food picker is the foundation, not any screen
 
-The real gap. Today's search box queries **only the local `foods` cache** — things you
-have already scanned or entered. Whole foods (chicken breast, rolled oats, a banana)
-have no barcode and so can never enter the cache by scanning.
+"Choose a food" happens in at least four places: adding to the diary, adding an
+ingredient to a recipe, swapping a component in a Creami, and managing
+favourites. That is **one component**, used by all of them:
+
+> search local cache → search remote → scan → recents → favourites
+> → returns a food + quantity
+
+Build it once and the Foods tab, the recipe builder and the Creami flow all become
+thin. Build it three times and this gets ugly fast. **Do this before the screens that
+depend on it.**
+
+### When past logs change, and when they don't
+
+Two cases, two mechanisms, and the split is already correct in the code. Preserve it:
+
+| Change | Past logs | Why |
+|---|---|---|
+| A food's macros were **wrong** and get corrected | **Do update** | `food_logs` stores a *relation* to the food plus a quantity; kcal is computed at render time from the current food record. Corrections propagate automatically. |
+| A **recipe** changes (amounts, new ingredients) | **Don't update** | `logRecipe` expands the recipe into individual `food_logs` rows at log time. Those rows reference foods directly with no link back to the recipe, so recipe edits can't reach backwards. |
+
+This is the intended behaviour, confirmed by Sean. Don't "fix" either half.
+
+The one edge it doesn't cover: a product **reformulated** rather than mis-entered would
+also rewrite history that was correct at the time. The escape hatch is creating a new
+food rather than editing the old one. Not worth building for.
+
+---
+
+## Build order
+
+Each step leans on the ones above it. The first two are load-bearing — doing anything
+else first means redoing it.
+
+### 1. Serving units — **blocks everything else**
+
+Surfaced while importing a real Cronometer day. Most items were unit-based — "1 Pack",
+"3 wrap", "0.5 each", "2 cookie" — with **no gram weight on the label**. `foods` stores
+per 100 g and `food_logs` stores grams, so there was nowhere to put them.
+
+The import worked around it with the convention **100 g == 1 natural unit** of that food
+(per wrap, per cookie, per pack): the per-unit kcal goes in `kcal`, and the log records
+`units * 100` grams. Totals come out exact, but the gram figures are fictional —
+"300 g" of mini wraps means three wraps.
+
+Affected records are tagged `source: 'manual'` with a `raw.basis` string spelling out
+the basis used, plus `raw.imported_from: 'cronometer'`. They are findable and
+migratable.
+
+The real fix is a unit on `foods` — something like `unit_label` plus `unit_g` (null when
+the unit has no gram equivalent) — and letting `food_logs` record either grams or units.
+
+Why this is first: **protein powder is scoops.** Recipes are unusable while every
+ingredient is pinned to a fake 100 g basis, and a "1 scoop" ingredient is exactly the
+case that breaks. It also gets worse with delay — every workaround record needs
+rewriting, and the cache only grows.
+
+### 2. The picker sheet, and fixing the input flow
+
+The current diary input is clunky, for a specific reason: three competing entry points
+(Scan / Add manually / search box) sit at the top of the day, none of them knowing which
+meal you're adding to. So you pick a food and *then* get asked which meal — backwards.
+
+Replace with a **`+` on each meal header**. Tapping it means "add to lunch", so the meal
+is decided by where you tapped and the meal pills disappear entirely. That `+` opens one
+sheet:
+
+- search field, focused, keyboard up
+- recents/favourites listed underneath before you type anything
+- scan icon in the corner
+- "create custom food" at the bottom as the fallback
+
+One surface, one mental model. The fastest path — re-logging something eaten constantly
+— becomes zero typing. It also collapses today's two-step (pick food → modal for
+grams/meal) into a single sheet with a quantity field.
+
+This sheet **is** the shared picker from the architecture notes. Build it as such.
+
+### 3. Remote food search
+
+Needed before the recipe builder is worth using: a builder is only as good as its
+ingredient pool, and right now you can only pick things already scanned. Whole foods
+(chicken breast, rolled oats, a banana) have no barcode and can never enter the cache
+by scanning.
 
 **Read this before picking a source — it invalidates the obvious approach:**
 
@@ -66,74 +145,94 @@ Recommended instead, in order:
 
 1. **AFCD (Australian Food Composition Database, FSANZ)** — the authoritative AU source
    for whole foods. ~1,600 items, free XLSX download, government data, static. No API,
-   so it must be a one-off import into `foods` with `source: 'afcd'`. This is the right
-   fix for "chicken breast" and it's a bounded, offline, one-afternoon job. **Start here.**
+   so a one-off import into `foods` with `source: 'afcd'`. Bounded, offline,
+   one-afternoon job. **Start here.**
 2. **FatSecret Platform API** — best AU *branded* coverage of the commercial options
    (Woolworths/Coles house brands), free tier, OAuth + attribution required. Worth it
    only if AFCD + scanning still leaves real gaps. Measure before committing.
 3. **USDA FoodData Central** — free, huge, but US portions and fortification differ
    enough to be misleading for AU products. Last resort.
 
-Note that a server-side key (FatSecret) breaks the current no-worker architecture —
-you'd need a worker sidecar, and the `fridge` app is the pattern to copy.
+A server-side key (FatSecret) breaks the current no-worker architecture — you'd need a
+worker sidecar, and the `fridge` app is the pattern to copy.
 
-### 3. Recipes
+### 4. Foods tab — the manager
+
+Browse, search, edit, delete. Fix wrong macros (which, per the table above, corrects
+history). Create custom foods properly rather than via the diary's fallback path.
+Mark favourites, which feed the picker's default list.
+
+No logging affordances here beyond convenience — the diary owns logging.
+
+### 5. Recipes
 
 **Schema and API already exist and work; there is no UI.** See `recipes` in the
 migration, and `createRecipe` / `getRecipes` / `logRecipe` / `deleteRecipe` in
 `food/api.js`. `logRecipe` is written and unused.
 
-The design decision worth preserving: **a recipe is a template, not a log entry.**
-`logRecipe` expands its items into individual `food_logs` rows at log time, dividing by
-`servings`. That means editing a recipe later never rewrites history you already
-logged. Don't "simplify" this into a stored reference — it silently corrupts past days.
+To build: a recipe list, a builder (picker → item list → servings), and a "log one
+serving" action reachable from the diary.
 
-Still to build: a recipe list screen, a builder (search/scan foods into an item list),
-serving-size handling, and a "log one serving" action on the day view.
+**Log flow must be edit-before-log**: tapping a recipe opens its item list pre-filled,
+you swap or add rows, then confirm. This was chosen over two rejected alternatives:
 
-### 4. Daily targets
+- *Duplicate-and-edit per variant* — the library rots into "Creami Choc Whey", "Creami
+  Vanilla Casein"… a dozen near-identical recipes.
+- *Typed slots in the schema* ("protein powder: pick 1", "mixins: pick 0..n") — more
+  correct-feeling, but a lot of machinery for one use case.
+
+Edit-before-log needs no new schema concepts, and handles the Creami case *and* every
+ordinary "I made this but with less cheese" case. It also fits what's already built:
+recipes already expand into diary rows at log time, so this just means touching the
+list before expansion.
+
+Cheap addition worth having: mark items `swappable` so the edit screen floats them to
+the top with a swap affordance. Most of the slots ergonomics, none of the slots model.
+
+### 6. Ninja Creami support
+
+Sean's actual pattern: **two bases**, varying the protein powder and/or mixins.
+
+Confirmed: **the bases differ in macros, and different flavours vary the macros too.**
+So a powder swap is a real ingredient substitution with real numbers, not a label. Each
+powder must exist as its own food with its own macros — which is why §1 (scoops) blocks
+this.
+
+Given edit-before-log from §5, this needs little beyond `swappable` items and possibly
+"save this variation" once the common combinations are known. If it turns out the same
+four Creamis recur, that naturally becomes a favourites list.
+
+Deferred by Sean — captured now, build later.
+
+### 7. Daily targets
 
 Nothing exists. Needs a new collection (or user-scoped settings record) — kcal plus
-optional protein/fat/carb targets, and ideally date-effective so changing a target
-doesn't retroactively rescore old days.
+optional protein/fat/carb targets, ideally date-effective so changing a target doesn't
+retroactively rescore old days.
 
-UI: a ring or bar against the day total in the Food header. The header currently shows
-a bare number, which is where the remaining/over figure belongs.
+UI: a ring or bar against the day total in the diary header, which currently shows a
+bare number — that's where remaining/over belongs.
 
-Consider deriving a suggested target from the weight trend — the weight data is right
-there in the same database, which is the whole reason for putting food in this app.
+Consider deriving a suggested target from the weight trend. The weight data is in the
+same database, which is the whole reason food lives in this app.
 
-### 5. Serving units — **unplanned, but now the most pressing gap**
+### 8. Copy meals/foods to another day
 
-Surfaced while importing a real Cronometer day (2026-08-07). Most items were
-unit-based — "1 Pack", "3 wrap", "0.5 each", "2 cookie" — with **no gram weight on
-the label**. `foods` stores per 100 g and `food_logs` stores grams, so there was
-nowhere to put them.
+Cheapest useful version: "copy this meal to today", creating fresh `food_logs` rows
+with a new `date`. Everything needed is already in the schema.
 
-The import worked around it with the convention **100 g == 1 natural unit** of that
-food (per wrap, per cookie, per pack): the per-unit kcal goes in `kcal`, and the log
-records `units * 100` grams. Totals come out exact, but the gram figures are fictional
-— "300 g" of mini wraps means three wraps.
+Follow-ons: duplicate a single entry, copy a whole day.
 
-Affected records are tagged: `source: 'manual'` with a `raw.basis` string spelling out
-which basis was used, and `raw.imported_from: 'cronometer'`. They can be found and
-migrated later.
+### Already mostly done — check before building
 
-The real fix is a unit on `foods` — something like `unit_label` plus `unit_g` (null
-when the unit has no gram equivalent) — and letting `food_logs` record either grams or
-units. Do this **before** the food database grows, because every workaround record
-above will need rewriting, and the local cache is the thing that makes the app worth
-using.
+**Meal categories.** Working: `meal` field on `food_logs`; `MEALS` and selectable pills
+in `FoodEntryModal`; `defaultMeal()` guesses from the clock; `FoodView` groups under
+`MEAL_ORDER`. Note §2 removes the pills in favour of per-meal `+`.
 
-### 6. Copy meals/foods to another day
-
-Nothing exists. Cheapest useful version: on the day view, "copy this meal to today",
-creating fresh `food_logs` rows with a new `date`. Everything needed is already in the
-schema.
-
-Natural follow-ons: duplicate a single entry, "log again" from a recent-foods list, and
-copy a whole day. A recent-foods list is arguably higher value than search for daily
-use — people eat the same things repeatedly.
+Genuinely missing: per-meal subtotals; moving an entry to another meal after logging;
+the meal set is hard-coded in two files (`MEALS` in `FoodEntryModal.jsx`, `MEAL_ORDER`
+in `FoodView.jsx`) and should be unified if it ever becomes configurable; logs with an
+empty `meal` are bucketed into `snack` by the view rather than explicitly.
 
 ---
 
@@ -142,16 +241,20 @@ use — people eat the same things repeatedly.
 Infrastructure and PocketBase gotchas are in `CLAUDE.md` and `~/docs/track.md`. These
 are the food-specific ones:
 
+- **Dates are local, never UTC.** `toISOString().slice(0, 10)` is the tempting one-liner
+  and it is wrong anywhere east of Greenwich. In AEST it reported yesterday for the
+  first 10-11 hours of every day, disabled the next-day arrow, and broke day-stepping
+  (forward was a silent no-op, back skipped two days). Use `src/dates.js`. An entry
+  belongs to the day you were living, not the UTC day.
 - **`json` fields need an explicit `maxSize`.** Creating one with `options: {}` stores
   `maxSize: 0`, and 0 means *reject everything*, not *no limit*. Writes fail with
   `validation_json_size_limit: The maximum allowed JSON size is 0 bytes`. This shipped
   broken and silently disabled OFF caching (`foods.raw`) and all recipe saves
   (`recipes.items`) until `1786113033_json_field_max_size.js` fixed it. It went
   unnoticed because the end-to-end test had `raw` stripped from its payload — **test
-  the json fields with actual content.**
-- **Macros are stored per 100 g. Always.** Every source normalises to that basis on
-  ingestion, so a serving is one multiply (`macrosFor`). Don't introduce per-serving
-  storage — it forces a unit check at every call site.
+  json fields with actual content.**
+- **Macros are stored per 100 g** (pending §1). Every source normalises to that basis on
+  ingestion, so a serving is one multiply (`macrosFor`).
 - **Missing macros are `null`, not `0`.** "Unknown" and "genuinely zero" must not be
   conflated, or totals quietly under-report. `FoodEntryModal` preserves this: a blank
   field stays blank.
@@ -166,13 +269,13 @@ are the food-specific ones:
   `vite.config.js`, `manualChunks` names it). It's ~170 kB gzip that Chrome on Android
   never fetches. If you touch the build config, don't let it back into the precache —
   it regresses app-shell load time, which was a previously-fixed problem.
+- **`docker compose` must be run from `/home/sean`.** Running it from the frontend
+  directory fails with `no such service: track`, and the build silently doesn't deploy.
 
 ## Ideas not asked for
 
-- **Recent foods** on the day view — likely the single biggest daily-use win, and
-  cheap. See §5.
 - **Contribute misses back to OFF.** Manual entries with a barcode are exactly what OFF
-  is missing for AU products. Improves the shared DB and your own future hit rate.
+  lacks for AU products. Improves the shared DB and your own future hit rate.
 - **Photo of the nutrition panel → Claude → fields.** The `fridge` app already shells
   out to the Claude CLI from a worker; that pattern would drop straight in and would
-  make manual entry near-free.
+  make manual entry near-free. Likely the highest-leverage idea here.
