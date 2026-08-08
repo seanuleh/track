@@ -257,7 +257,7 @@ Shipped:
   wrapping the name or pushing the stats onto their own row — one dense line per card.
   **This is the piece §10 changes**: right now the number is always per-100g; see below.
 
-### 5. Recipes — list + builder ✅ **done 2026-08-08**, logging from the diary still open
+### 5. Recipes — list + builder + edit-before-log ✅ **done 2026-08-08**
 
 Schema and API existed since §1 with no UI (`recipes` in the migration; `createRecipe` /
 `getRecipes` / `updateRecipe` / `deleteRecipe` / `logRecipe` in `food/api.js`). Shipped as
@@ -275,12 +275,16 @@ one-tap log, not edit-before-log. `FoodPickerSheet.jsx` lists recipes (fetched o
 per-serving kcal precomputed via a local `recipeKcal` helper — a duplicate of
 `RecipesView`'s `totalsFor`, not imported, since that helper is private to the view)
 alongside foods, both before typing and filtered client-side against the search query.
-Tapping one calls `logRecipe` immediately with the clock-guessed meal (or the sheet's
-locked meal, same as a single food). **Edit-before-log below is still not built** — this
-covers "log it as-is" only, not the Creami swap-an-ingredient case.
+**Edit-before-log — ✅ done 2026-08-08** (`RecipeLogModal.jsx`). Tapping a recipe in the
+picker sheet opens its item list pre-filled at one serving (recipe amounts / servings),
+same shape as `RecipeBuilderModal`'s rows: live per-ingredient kcal, amount/unit
+editable inline, remove a row, add one via `FoodPicker` (the swap case is remove-then-add,
+not a dedicated swap button — the roadmap's `swappable` idea below is still not built).
+Confirming calls the new `logRecipeItems` (the shared expansion logic `logRecipe` now
+delegates to) with the edited list, not the saved recipe, so edits here never touch the
+recipe definition — same "expand by value" rule the rest of this section relies on.
 
-**Log flow must be edit-before-log**: tapping a recipe opens its item list pre-filled,
-you swap or add rows, then confirm. This was chosen over two rejected alternatives:
+This was chosen over two rejected alternatives:
 
 - *Duplicate-and-edit per variant* — the library rots into "Creami Choc Whey", "Creami
   Vanilla Casein"… a dozen near-identical recipes.
