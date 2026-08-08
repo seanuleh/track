@@ -138,6 +138,20 @@ multiply. Filled on demand from Open Food Facts barcode lookups, plus manual ent
 | sodium | number | mg per 100 g |
 | raw | json | untouched upstream payload, for later backfill |
 
+**`food_catalog`** (base collection) — a local mirror of the ~75k Open Food Facts
+products sold in AU/NZ. Read-only to clients (`createRule`/`updateRule`/`deleteRule` are
+all null); written only by `scripts/off-import.py` straight to SQLite, because 75k
+inserts over the REST API would take hours. Unique index on `barcode`.
+
+Deliberately **not** merged into `foods`. `foods` means "things I actually eat" and backs
+the manager, favourites and the barcode cache; 75k imported rows would make it a
+haystack. The two join by behaviour: search hits the catalog, and `ensureFoodFromCatalog`
+**copies** a row into `foods` the first time it's logged — by value, so a later catalog
+refresh can't rewrite macros behind days already logged.
+
+Same reason `resolveBarcode` is now three tiers: `foods` → `food_catalog` → OFF network.
+Most scans never touch the network.
+
 **`food_logs`** (base collection) — one row per thing eaten: `date` (YYYY-MM-DD),
 `food` (relation → foods), `amount`, `unit`, `meal`, `user`. Indexed on `(user, date)`.
 
@@ -178,6 +192,40 @@ is still `food` in localStorage so the stored preference survived the rename.
 - **Chart**: Recharts AreaChart, proportional time X axis
 - **Entry list**: reverse-chrono cards, infinite scroll via IntersectionObserver
 - **FAB**: fixed bottom-right `+` opens modal
+
+## Open Food Facts catalog
+
+```
+food.parquet (7.75 GB, 4.66M products, nightly on Hugging Face)
+   │  DuckDB — scripts/off_extract.sql, AU/NZ + 13 columns
+   ▼
+catalog.csv (7.6 MB, 75k rows)  ──►  food_catalog   [~4 s end to end]
+
+delta/*.json.gz (~23 MB/day, 14-day window)
+   │  scripts/off-import.py delta — parsed in Python
+   ▼
+food_catalog (upsert, newest-wins)              [nightly, ~6 s]
+```
+
+- Seed/rebuild: `python3 scripts/off-import.py full` (downloads the parquet unless
+  `--parquet` points at one). Takes ~4 s once the parquet is local.
+- Nightly: `off-catalog-sync.timer` (user systemd, 03:30 + jitter) → `delta` mode.
+  Applied files tracked in `/data/off/delta-state.json`, so a missed night catches up.
+- **The deltas only cover 14 days.** If the timer is broken longer than that, reseed
+  from the parquet — the mirror can't catch up on its own.
+- DuckDB CLI lives at `/home/sean/bin/duckdb` (not a package).
+
+Two shapes, which is why `full` and `delta` are separate code paths and not one:
+the parquet has `nutriments` as a `STRUCT(name, "100g", …)[]` list and `product_name` as
+a `STRUCT(lang, text)[]`; the deltas have **`nutrition.aggregated_set`** (nutrients dict
+plus an explicit `per` basis) and a plain-string `product_name`. There is no top-level
+`nutriments` in current deltas at all. Both paths must keep the same rules: kJ→kcal at
+4.184, sodium g→mg, drop rows with no energy, and drop kcal > 900/100 g (impossible —
+pure fat is 900 — and always an upstream entry error).
+
+`aggregated_set.per` is the subtle one: `100g`/`100ml` are taken at face value,
+`serving` is scaled by `serving_quantity`, and anything else is **skipped** rather than
+assumed, since guessing the basis silently corrupts the macros.
 
 ## Dependencies
 

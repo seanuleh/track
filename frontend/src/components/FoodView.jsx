@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getLogsForDate, deleteLog, resolveBarcode, searchFoods, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
+import { getLogsForDate, deleteLog, resolveBarcode, searchFoods, searchCatalog, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
 import Scanner from './Scanner.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
 import { today, shiftDate } from '../dates.js'
@@ -18,6 +18,7 @@ export default function FoodView() {
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
+  const [catalogResults, setCatalogResults] = useState([])
 
   const load = useCallback(async () => {
     try {
@@ -32,16 +33,26 @@ export default function FoodView() {
 
   useEffect(() => { load() }, [load])
 
-  // Search the local cache — foods you've already scanned, plus manual entries.
+  // Two sources, both local: your own foods, then the Open Food Facts mirror.
+  // Yours first because a food you've logged before is nearly always the one
+  // you mean, and it carries your corrections and serving units.
   useEffect(() => {
-    if (!query.trim()) { setResults([]); return }
+    if (!query.trim()) { setResults([]); setCatalogResults([]); return }
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const found = await searchFoods(query)
-        if (!cancelled) setResults(found)
+        const [mine, catalog] = await Promise.all([
+          searchFoods(query),
+          searchCatalog(query),
+        ])
+        if (cancelled) return
+        setResults(mine)
+        // Drop catalog rows already in your library, or the same product
+        // appears twice with the top one being the stale copy.
+        const known = new Set(mine.map(f => f.barcode).filter(Boolean))
+        setCatalogResults(catalog.filter(c => !known.has(c.barcode)))
       } catch { /* a failed search shouldn't disturb the day view */ }
-    }, 250)
+    }, 200)
     return () => { cancelled = true; clearTimeout(t) }
   }, [query])
 
@@ -54,11 +65,18 @@ export default function FoodView() {
       // A miss opens the same modal in manual mode, carrying the barcode so
       // the food gets saved against it and the next scan hits the cache.
       setPending({ food, barcode })
-      if (origin === 'off') setStatus('Added from Open Food Facts')
+      if (origin === 'catalog') setStatus('Found in the local Open Food Facts catalog')
+      else if (origin === 'off') setStatus('Added from Open Food Facts')
     } catch (err) {
       setStatus(null)
       setError(err.message)
     }
+  }
+
+  function clearSearch() {
+    setQuery('')
+    setResults([])
+    setCatalogResults([])
   }
 
   async function handleDelete(id) {
@@ -117,22 +135,39 @@ export default function FoodView() {
       <div className="food-search">
         <input
           className="form-input"
-          placeholder="Search foods you've logged before…"
+          placeholder="Search foods…"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
-        {results.length > 0 && (
+        {(results.length > 0 || catalogResults.length > 0) && (
           <div className="search-results">
             {results.map(f => (
               <button
                 key={f.id}
                 className="search-result"
-                onClick={() => { setPending({ food: f, barcode: f.barcode }); setQuery(''); setResults([]) }}
+                onClick={() => { setPending({ food: f, barcode: f.barcode }); clearSearch() }}
               >
                 <span className="sr-name">{f.name}</span>
                 <span className="sr-meta">
                   {f.brand ? `${f.brand} · ` : ''}
                   {f.kcal != null ? `${Math.round(f.kcal)} kcal/100g` : '—'}
+                </span>
+              </button>
+            ))}
+
+            {catalogResults.length > 0 && (
+              <div className="sr-divider">Open Food Facts</div>
+            )}
+            {catalogResults.map(c => (
+              <button
+                key={c.id}
+                className="search-result"
+                onClick={() => { setPending({ catalog: c, barcode: c.barcode }); clearSearch() }}
+              >
+                <span className="sr-name">{c.name}</span>
+                <span className="sr-meta">
+                  {c.brand ? `${c.brand} · ` : ''}
+                  {Math.round(c.kcal)} kcal/100g
                 </span>
               </button>
             ))}
@@ -176,6 +211,7 @@ export default function FoodView() {
       {pending && (
         <FoodEntryModal
           food={pending.food}
+          catalog={pending.catalog}
           barcode={pending.barcode}
           date={date}
           onSaved={() => { setPending(null); setStatus(null); load() }}

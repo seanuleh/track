@@ -17,10 +17,26 @@ export async function createFood(food) {
   return pb.collection('foods').create(food)
 }
 
+/**
+ * Build a filter that requires every word of the query to appear somewhere in
+ * the name or brand.
+ *
+ * A single `name ~ "weet bix"` is a substring match, so it misses "Weet-Bix" —
+ * and product names are full of hyphens, commas and pack sizes that sit
+ * between the words you'd actually type. Matching each word independently
+ * means word order and punctuation stop mattering.
+ */
+function wordFilter(query) {
+  const words = query.trim().split(/\s+/).slice(0, 6)
+  return words
+    .map(w => pb.filter('(name ~ {:w} || brand ~ {:w})', { w }))
+    .join(' && ')
+}
+
 export async function searchFoods(query) {
   if (!query.trim()) return []
   const rows = await pb.collection('foods').getList(1, 20, {
-    filter: pb.filter('name ~ {:q} || brand ~ {:q}', { q: query }),
+    filter: wordFilter(query),
     sort: 'name',
   })
   return rows.items
@@ -38,6 +54,63 @@ export async function listFoods({ query = '', page = 1, perPage = 50 } = {}) {
     opts.filter = pb.filter('name ~ {:q} || brand ~ {:q} || barcode ~ {:q}', { q: query })
   }
   return pb.collection('foods').getList(page, perPage, opts)
+}
+
+// ── food_catalog ─────────────────────────────────────────────────────────
+
+/**
+ * Search the local Open Food Facts mirror (~75k AU/NZ products).
+ *
+ * Local, so it's fast enough to run as you type and works with OFF down or
+ * offline. Ranked by name matches before brand matches — typing "tim tam"
+ * should surface the biscuit, not everything Arnott's makes.
+ */
+export async function searchCatalog(query, limit = 20) {
+  if (!query.trim()) return []
+  const rows = await pb.collection('food_catalog').getList(1, limit, {
+    filter: wordFilter(query),
+    sort: 'name',
+  })
+  // Rank client-side: a name that starts with what you typed is almost always
+  // what you meant, and a shorter name beats a longer one carrying pack sizes
+  // and marketing ("Vegemite" over "Vegemite 455g Spread Jar").
+  const q = query.trim().toLowerCase()
+  const score = f => {
+    const name = (f.name || '').toLowerCase()
+    if (name.startsWith(q)) return 0
+    if (name.includes(q)) return 1
+    return 2
+  }
+  return rows.items.sort(
+    (a, b) => score(a) - score(b) || (a.name || '').length - (b.name || '').length
+  )
+}
+
+/**
+ * Promote a catalog row into `foods` so it can be logged against.
+ *
+ * `food_logs.food` is a relation to `foods`, and `foods` means "things I
+ * actually eat" — so the catalog is copied in on first use rather than being
+ * logged against directly. Same write-through pattern as a barcode lookup,
+ * sourced from the local mirror instead of the network.
+ *
+ * Copies by value: a later catalog refresh must not silently rewrite the
+ * macros behind days you've already logged.
+ */
+export async function ensureFoodFromCatalog(item) {
+  if (item.barcode) {
+    const existing = await findFoodByBarcode(item.barcode)
+    if (existing) return existing
+  }
+  return createFood({
+    barcode: item.barcode || '',
+    name: item.name,
+    brand: item.brand || '',
+    source: 'off',
+    serving_g: item.serving_g || null,
+    kcal: item.kcal, protein: item.protein, fat: item.fat, carbs: item.carbs,
+    fiber: item.fiber, sugar: item.sugar, sodium: item.sodium,
+  })
 }
 
 export async function updateFood(id, data) {
@@ -69,15 +142,28 @@ export async function countLogsForFood(foodId) {
 /**
  * Resolve a scanned barcode to a food record.
  *
- * Write-through cache: local hit wins, otherwise ask Open Food Facts and store
- * the result so the next scan of that item is offline-capable and instant.
+ * Three tiers, cheapest first:
+ *   1. `foods` — you've logged it before, and it carries your corrections
+ *      and serving units, so it must win over any fresher upstream copy.
+ *   2. `food_catalog` — the local Open Food Facts mirror. No network, so most
+ *      scans resolve offline and stay fast when OFF is down or throttling.
+ *   3. Open Food Facts over the wire — for products newer than the last
+ *      catalog sync, or sold outside AU/NZ.
+ *
  * A miss is not an error — it means "prompt for manual entry".
  *
- * Returns { food, origin } where origin is 'cache' | 'off' | null.
+ * Returns { food, origin }, origin being 'cache' | 'catalog' | 'off' | null.
  */
 export async function resolveBarcode(barcode) {
   const cached = await findFoodByBarcode(barcode)
   if (cached) return { food: cached, origin: 'cache' }
+
+  const local = await pb.collection('food_catalog').getList(1, 1, {
+    filter: pb.filter('barcode = {:barcode}', { barcode }),
+  })
+  if (local.items[0]) {
+    return { food: await ensureFoodFromCatalog(local.items[0]), origin: 'catalog' }
+  }
 
   const fetched = await lookupBarcode(barcode)
   if (!fetched) return { food: null, origin: null }

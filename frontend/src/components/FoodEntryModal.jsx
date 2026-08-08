@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFood, logFood, macrosFor, gramsFor } from '../food/api.js'
+import { createFood, logFood, macrosFor, gramsFor, ensureFoodFromCatalog } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -14,13 +14,19 @@ function defaultMeal() {
 }
 
 /**
- * Two modes:
- *  - `food` given → confirm the portion and log it.
- *  - `food` null  → the barcode wasn't in the cache or Open Food Facts, so
- *                   capture the label by hand and log it. The food is saved to
- *                   `foods`, making this a one-time cost per item.
+ * Three modes:
+ *  - `food` given    → confirm the portion and log it.
+ *  - `catalog` given → a hit from the local Open Food Facts mirror. It is
+ *                      copied into `foods` on submit, not on tap, so browsing
+ *                      the catalog and backing out doesn't litter the library.
+ *  - neither         → the barcode wasn't in the cache, the catalog or Open
+ *                      Food Facts, so capture the label by hand. Saved to
+ *                      `foods`, making it a one-time cost per item.
  */
-export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }) {
+export default function FoodEntryModal({ food, catalog, barcode, date, onSaved, onClose }) {
+  // A catalog row has the same macro shape as a food, so everything below
+  // treats it as one — only the save path differs.
+  food = food || catalog || null
   const isManual = !food
 
   // A food that defines a unit (scoop, block, ml) defaults to one of them;
@@ -65,6 +71,9 @@ export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }
           barcode: barcode || '',
           source: 'manual',
         })
+      } else if (catalog) {
+        // Promote now that it's actually being logged.
+        target = await ensureFoodFromCatalog(catalog)
       }
       await logFood({ date, foodId: target.id, amount: a, unit, food: target, meal })
       onSaved()

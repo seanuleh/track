@@ -872,6 +872,17 @@ body {
   gap: 6px;
 }
 
+/* Separates your own foods from Open Food Facts hits in the search list, so
+   it's clear which results carry your own corrections and units. */
+.sr-divider {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  border-top: 1px solid var(--border);
+}
+
 /* Favourite star in the Foods list. Sized for a thumb without stealing width
    from the name — the whole row is the edit target, this is the exception. */
 .fav-star {

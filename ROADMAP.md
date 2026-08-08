@@ -137,7 +137,29 @@ grams/meal) into a single sheet with a quantity field.
 
 This sheet **is** the shared picker from the architecture notes. Build it as such.
 
-### 3. Remote food search
+### 3. Remote food search — ✅ **done 2026-08-08, but not as written below**
+
+Solved by **mirroring OFF locally** rather than by calling any search API, which makes
+most of the analysis below moot. Keep reading it only for the AFCD recommendation, which
+still stands for whole foods.
+
+`food_catalog` holds the 75,366 AU/NZ products from the nightly parquet dump. Search is a
+local SQLite query: **10 ms**, ~20–50 ms through the API, fast enough to filter as you
+type, and it works with OFF down or the network gone. The whole DB went from 9.2 MB to
+19 MB — the mirror is ~10 MB, an order of magnitude under the earlier estimate.
+
+This also removed the rate-limit problem entirely rather than working around it: nothing
+queries OFF's `/search`, and `resolveBarcode` only reaches the network for products newer
+than the last sync or sold outside AU/NZ.
+
+Scope is AU + NZ (Sean's call): 62,896 AU, 10,591 NZ, 2,040 both. UK/US were rejected as
+noise — they'd have added 1.1M rows of products you can't buy.
+
+Still worth doing: **AFCD**, per the recommendation below. OFF is a barcode database, so
+it covers whole foods (chicken breast, rolled oats, a banana) badly — exactly the gap
+§5's recipe builder will hit.
+
+### 3b. Remote food search — the original analysis
 
 Needed before the recipe builder is worth using: a builder is only as good as its
 ingredient pool, and right now you can only pick things already scanned. Whole foods
@@ -302,6 +324,13 @@ are the food-specific ones:
   Australian labels lead with kJ, so this path is common, not an edge case.
 - **OFF products can lack a name.** `off.js` returns `null` for those rather than
   caching a nameless record you can't identify later.
+- **OFF's data quality is not guaranteed, and the mirror inherits that.** Real examples
+  found on import: a V energy drink stating 147 kcal/100 ml while its own kJ figure works
+  out to 59, and a Tim Tam Double Coat at 233 kcal when the plain one is 524. The
+  importer only rejects the physically impossible (kcal > 900/100 g, 161 rows); plausible
+  but wrong values get through by design, because there is no way to tell them from real
+  ones. The Foods manager is the fix — correcting a food there also corrects every day it
+  was logged on.
 - **Coverage is not 100%** and never will be. Manual entry isn't a fallback bolted on
   the side, it's a core path — every miss must stay one tap from being logged.
 - **The ZXing chunk is excluded from the SW precache** (`globIgnores` in
