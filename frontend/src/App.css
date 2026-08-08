@@ -940,6 +940,12 @@ body {
   flex: 0 0 auto;
 }
 
+@media (min-width: 481px) {
+  .log-stats {
+    gap: 14px;
+  }
+}
+
 .log-macros {
   flex: 0 0 auto;
   display: flex;
