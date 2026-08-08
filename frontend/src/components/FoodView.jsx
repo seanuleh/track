@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getLogsForDate, deleteLog, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
+import { getLogsForDate, deleteLog, updateLogMeal, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
 import FoodPickerSheet from './FoodPickerSheet.jsx'
+import FAB from './FAB.jsx'
 import { today, shiftDate } from '../dates.js'
 
 const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -11,7 +12,9 @@ export default function FoodView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const [addingMeal, setAddingMeal] = useState(null) // meal name for the open picker sheet
+  const [adding, setAdding] = useState(false) // FAB-opened picker sheet; meal is chosen inside
+  const [dragId, setDragId] = useState(null)
+  const [dragOverMeal, setDragOverMeal] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -36,10 +39,27 @@ export default function FoodView() {
     }
   }
 
+  async function handleDrop(meal) {
+    setDragOverMeal(null)
+    const id = dragId
+    setDragId(null)
+    if (!id) return
+    const log = logs.find(l => l.id === id)
+    if (!log || (log.meal || 'snack') === meal) return
+    // Reflect the move immediately — waiting on the round trip makes the drop feel unresponsive.
+    setLogs(ls => ls.map(l => (l.id === id ? { ...l, meal } : l)))
+    try {
+      await updateLogMeal(id, meal)
+    } catch (err) {
+      setError(err.message)
+      await load()
+    }
+  }
+
   const totals = totalMacros(logs)
 
-  // Every meal always gets a header — including empty ones — so its `+` is
-  // reachable without first logging something into it another way.
+  // Every meal always gets a header, including empty ones, so it's a valid drop
+  // target even before anything has ever been logged into it.
   const byMeal = MEAL_ORDER
     .map(meal => ({ meal, items: logs.filter(l => (l.meal || 'snack') === meal) }))
 
@@ -74,23 +94,28 @@ export default function FoodView() {
       {error && <div className="error">{error}</div>}
 
       {byMeal.map(({ meal, items }) => (
-        <div key={meal}>
-          <div className="section-title section-title--meal">
-            <span>{meal}</span>
-            <button
-              type="button"
-              className="meal-add-btn"
-              aria-label={`Add to ${meal}`}
-              onClick={() => setAddingMeal(meal)}
-            >+</button>
-          </div>
-          {items.length > 0 && (
+        <div
+          key={meal}
+          className={`meal-section${dragOverMeal === meal ? ' meal-section--dragover' : ''}`}
+          onDragOver={(e) => { if (dragId) { e.preventDefault(); setDragOverMeal(meal) } }}
+          onDragLeave={() => setDragOverMeal(m => (m === meal ? null : m))}
+          onDrop={(e) => { e.preventDefault(); handleDrop(meal) }}
+        >
+          <div className="section-title">{meal}</div>
+          {items.length > 0 ? (
             <div className="log-list">
               {items.map(log => {
                 const food = log.expand?.food
                 const m = macrosFor(food, gramsFor(log, food))
                 return (
-                  <div key={log.id} className="log-card" onClick={() => handleDelete(log.id)}>
+                  <div
+                    key={log.id}
+                    className={`log-card${dragId === log.id ? ' log-card--dragging' : ''}`}
+                    draggable
+                    onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(log.id) }}
+                    onDragEnd={() => { setDragId(null); setDragOverMeal(null) }}
+                    onClick={() => handleDelete(log.id)}
+                  >
                     <div className="log-main">
                       <div className="log-name">{food?.name || 'Unknown food'}</div>
                       <div className="log-meta">
@@ -103,16 +128,19 @@ export default function FoodView() {
                 )
               })}
             </div>
+          ) : (
+            <div className="meal-empty">Drop food here, or use + to add</div>
           )}
         </div>
       ))}
 
-      {addingMeal && (
+      <FAB onClick={() => setAdding(true)} />
+
+      {adding && (
         <FoodPickerSheet
-          meal={addingMeal}
           date={date}
-          onClose={() => setAddingMeal(null)}
-          onLogged={() => { setAddingMeal(null); load() }}
+          onClose={() => setAdding(false)}
+          onLogged={() => { setAdding(false); load() }}
         />
       )}
     </>

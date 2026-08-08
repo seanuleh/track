@@ -4,10 +4,11 @@ import Scanner from './Scanner.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
 
 /**
- * The single entry point for "add something to this meal" — replaces the old
- * top-of-day Scan/Add-manually/Search trio, none of which knew which meal you
- * meant. Opened from a `+` on a meal header, so the meal is already decided;
- * everything here ends at `FoodEntryModal` with that meal locked in.
+ * The single entry point for "add something" — replaces the old top-of-day
+ * Scan/Add-manually/Search trio. Opened from the diary's FAB; meal isn't
+ * decided here (that's `FoodEntryModal`'s job, defaulting from the clock) —
+ * dragging a logged entry between meal sections is the other way to fix it
+ * up afterwards.
  *
  * Before you type: recents and favourites, so re-logging something you eat
  * constantly is zero typing. After you type: your own foods, then the local
@@ -81,7 +82,7 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
-          <div className="modal-title modal-title--compact">Add to {meal}</div>
+          <div className="modal-title modal-title--compact">{meal ? `Add to ${meal}` : 'Add food'}</div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 

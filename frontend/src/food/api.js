@@ -244,6 +244,11 @@ export async function deleteLog(id) {
   return pb.collection('food_logs').delete(id)
 }
 
+/** Reassign a logged entry to a different meal — the drag-between-meals target. */
+export async function updateLogMeal(id, meal) {
+  return pb.collection('food_logs').update(id, { meal })
+}
+
 // ── recipes ──────────────────────────────────────────────────────────────
 
 export async function getRecipes() {
