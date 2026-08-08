@@ -160,6 +160,9 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
+          {query && (
+            <button type="button" className="food-search-clear" aria-label="Clear search" onClick={() => setQuery('')}>✕</button>
+          )}
         </div>
 
         <div className="food-actions">

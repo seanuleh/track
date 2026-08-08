@@ -60,6 +60,9 @@ export default function CatalogSearchModal({ onPicked, onClose }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
+          {query && (
+            <button type="button" className="food-search-clear" aria-label="Clear search" onClick={() => setQuery('')}>✕</button>
+          )}
         </div>
 
         {error && <div className="form-error">{error}</div>}

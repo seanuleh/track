@@ -1108,6 +1108,24 @@ body {
   margin-bottom: 20px;
 }
 
+.food-search .form-input {
+  padding-right: 34px;
+}
+
+.food-search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+}
+
 .search-results {
   position: absolute;
   top: calc(100% + 6px);

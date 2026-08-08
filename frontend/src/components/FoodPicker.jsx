@@ -54,6 +54,9 @@ export default function FoodPicker({ onPick }) {
         value={query}
         onChange={e => setQuery(e.target.value)}
       />
+      {query && (
+        <button type="button" className="food-search-clear" aria-label="Clear search" onClick={() => setQuery('')}>✕</button>
+      )}
       {error && <div className="form-error">{error}</div>}
       {(mine.length > 0 || catalog.length > 0) && (
         <div className="search-results">
