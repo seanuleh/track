@@ -116,7 +116,21 @@ Why this was first: **protein powder is scoops.** Recipes are unusable while eve
 ingredient is pinned to a fake 100 g basis, and a "1 scoop" ingredient is exactly the
 case that breaks.
 
-### 2. The picker sheet, and fixing the input flow
+### 2. The picker sheet, and fixing the input flow — ✅ **done 2026-08-08**
+
+Shipped as `FoodPickerSheet.jsx`, opened by a `+` on each meal header (`FoodView.jsx`).
+Meal headers now always render, even empty, so the `+` stays reachable. The sheet shows
+recents (`getRecentFoods`, read from `food_logs` — the log itself is the freshness
+signal) and favourites before typing, your own foods then the catalog after typing, a
+scan button, and "create custom food". Picking anything hands off to `FoodEntryModal`
+with `meal` locked, which now skips its own meal-pill step when a meal is preset. The
+old top-of-day Scan/Add-manually/search trio is gone.
+
+Not done as part of this: the quantity field isn't inline in the sheet itself — picking
+a result still opens `FoodEntryModal` as a second step for amount/unit. Full single-sheet
+fusion would mean duplicating `FoodEntryModal`'s amount/unit/portion logic inline; the
+two-tap version was judged good enough for now given meal-picking is already collapsed
+away, the bulk of the old friction.
 
 The current diary input is clunky, for a specific reason: three competing entry points
 (Scan / Add manually / search box) sit at the top of the day, none of them knowing which
