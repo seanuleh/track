@@ -179,6 +179,13 @@ export default function FoodView() {
             value={date}
             max={today()}
             onChange={e => e.target.value && setDate(e.target.value)}
+            // Desktop Chrome only opens the native picker on its calendar
+            // icon, not anywhere else in the field — unlike mobile, which
+            // opens on any tap. This is a direct handler on the real input
+            // reacting to a genuine click, not the pointer-events:none +
+            // detached-trigger pattern the CSS comment above warns is flaky
+            // on Android, so it's safe to add alongside the default behaviour.
+            onClick={e => e.target.showPicker?.()}
             aria-label="Pick a date"
           />
         </label>
