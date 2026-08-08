@@ -256,8 +256,8 @@ function WeightView() {
 // and disposable, the library is date-less and curated. The 'food' key is kept
 // for the diary so the stored tab preference survives the rename.
 const TABS = [
-  { key: 'food', label: 'Diary' },
   { key: 'foods', label: 'Foods' },
+  { key: 'food', label: 'Diary' },
   { key: 'weight', label: 'Weight' },
 ]
 
