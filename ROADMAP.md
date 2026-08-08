@@ -314,17 +314,20 @@ four Creamis recur, that naturally becomes a favourites list.
 
 Deferred by Sean — captured now, build later.
 
-### 7. Daily targets
+### 7. Daily targets — ✅ **done 2026-08-08**
 
-Nothing exists. Needs a new collection (or user-scoped settings record) — kcal plus
-optional protein/fat/carb targets, ideally date-effective so changing a target doesn't
-retroactively rescore old days.
+Shipped as `daily_targets` (`1786183000_daily_targets.js`) — kcal required,
+protein/fat/carbs optional. Date-effective as planned: `setTarget` always writes a new
+row rather than updating in place, and `getTargetForDate` resolves the newest row with
+`effective_date <= date`, so raising a target next month can't rescore days already
+logged against the old one.
 
-UI: a ring or bar against the day total in the diary header, which currently shows a
-bare number — that's where remaining/over belongs.
+UI: a bar + remaining/over badge in the diary header (`.target-row`, green under
+target, red over), and a "Set/Edit target" button opening `TargetsModal.jsx`. Only kcal
+drives the bar for now — the protein/fat/carb fields are captured but nothing displays
+progress against them yet.
 
-Consider deriving a suggested target from the weight trend. The weight data is in the
-same database, which is the whole reason food lives in this app.
+Not done: deriving a suggested target from the weight trend.
 
 ### 8. Copy meals/foods to another day
 
