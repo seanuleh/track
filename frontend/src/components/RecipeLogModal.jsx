@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { getFood, gramsFor, macrosFor, logRecipeItems } from '../food/api.js'
+import { getFood, gramsFor, macrosFor, logRecipeItems, createRecipe } from '../food/api.js'
 import FoodPicker from './FoodPicker.jsx'
 import { defaultMeal } from './FoodEntryModal.jsx'
+import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -17,6 +18,7 @@ const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
  * (that's the Recipes tab's job) — same "expand by value" rule as logRecipe.
  */
 export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogged, onClose }) {
+  useEscapeClose(onClose)
   const servings = Number(recipe.servings) || 1
   const [items, setItems] = useState(() =>
     (recipe.items || []).map(it => ({
@@ -31,6 +33,10 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
   const [meal, setMeal] = useState(presetMeal || defaultMeal())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [showSaveAs, setShowSaveAs] = useState(false)
+  const [saveAsName, setSaveAsName] = useState('')
+  const [savingAs, setSavingAs] = useState(false)
+  const [savedAs, setSavedAs] = useState(false)
 
   // The recipe only stores the relation, so fetch each ingredient once to
   // power the live kcal preview — same approach as RecipeBuilderModal.
@@ -71,6 +77,27 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
     ])
   }
 
+  async function handleSaveAs() {
+    if (!saveAsName.trim()) { setError('Name the variation.'); return }
+    if (items.length === 0) { setError('Add at least one ingredient.'); return }
+
+    setSavingAs(true)
+    setError(null)
+    try {
+      await createRecipe({
+        name: saveAsName.trim(),
+        servings: 1,
+        items: items.map(it => ({ food: it.food, name: it.name, amount: Number(it.amount) || 0, unit: it.unit })),
+      })
+      setSavedAs(true)
+      setShowSaveAs(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSavingAs(false)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (items.length === 0) { setError('Add at least one ingredient.'); return }
@@ -97,7 +124,7 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={onFormKeyDown}>
           {!presetMeal && (
             <div className="form-group form-group--compact">
               <label className="form-label">Meal</label>
@@ -140,6 +167,31 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
           </div>
 
           <FoodPicker onPick={addItem} />
+
+          {savedAs && !showSaveAs && (
+            <div className="ingredient-name">Saved as a new recipe.</div>
+          )}
+          {!showSaveAs ? (
+            <button type="button" className="btn btn-ghost btn-block" onClick={() => setShowSaveAs(true)}>
+              Save this variation as a new recipe
+            </button>
+          ) : (
+            <div className="form-group form-group--compact">
+              <label className="form-label">Variation name</label>
+              <div className="ingredient-row">
+                <input
+                  className="form-input form-input--compact"
+                  value={saveAsName}
+                  onChange={e => setSaveAsName(e.target.value)}
+                  placeholder={`${recipe.name} – variation`}
+                />
+                <button type="button" className="btn btn-ghost" onClick={() => setShowSaveAs(false)}>Cancel</button>
+                <button type="button" className="btn btn-primary" disabled={savingAs} onClick={handleSaveAs}>
+                  {savingAs ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && <div className="form-error">{error}</div>}
 

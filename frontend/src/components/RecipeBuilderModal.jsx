@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createRecipe, updateRecipe, getFood, gramsFor, macrosFor } from '../food/api.js'
 import FoodPicker from './FoodPicker.jsx'
+import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 /**
  * Create or edit a recipe: name, servings, and a list of
@@ -16,6 +17,7 @@ import FoodPicker from './FoodPicker.jsx'
  * than baked in.
  */
 export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
+  useEscapeClose(onClose)
   const isNew = !recipe
   const [name, setName] = useState(recipe?.name || '')
   const [servings, setServings] = useState(String(recipe?.servings || 1))
@@ -102,7 +104,7 @@ export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={onFormKeyDown}>
           <div className="form-group form-group--compact">
             <label className="form-label">Name</label>
             <input

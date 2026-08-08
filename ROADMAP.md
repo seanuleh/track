@@ -312,7 +312,15 @@ Given edit-before-log from §5, this needs little beyond `swappable` items and p
 "save this variation" once the common combinations are known. If it turns out the same
 four Creamis recur, that naturally becomes a favourites list.
 
-Deferred by Sean — captured now, build later.
+**"Save this variation" — ✅ done 2026-08-08.** `RecipeLogModal.jsx`: a "Save this
+variation as a new recipe" button below the ingredient list, revealing a name field.
+Confirming calls the existing `createRecipe` with the edited item list at `servings: 1`
+— the original recipe is untouched, same as logging. Swapping an ingredient itself
+needed no new code: edit-before-log already supports remove + `FoodPicker` add per row.
+
+Not done: no dedicated "swap" button in place of remove+re-add (two taps instead of
+one, judged fine), and no favourites-of-variations surface — revisit if the same
+Creami combos recur often enough to want one-tap recall.
 
 ### 7. Daily targets — ✅ **done 2026-08-08**
 

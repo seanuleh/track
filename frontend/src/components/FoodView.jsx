@@ -42,6 +42,24 @@ export default function FoodView() {
 
   useEffect(() => { load() }, [load])
 
+  // Desktop-only date nav: ← / → step the diary day, same bounds as the nav
+  // buttons. Ignored while typing anywhere, or while a modal sits on top —
+  // a modal's own Escape/Enter handling should be the only thing listening
+  // then, and stealing the arrow keys would fight the browser's native
+  // <input type="date"> field navigation inside CopyDateModal etc.
+  useEffect(() => {
+    const anyModalOpen = adding || editingLog || editingGroup || editingTarget || copying
+    if (anyModalOpen) return
+    function onKeyDown(e) {
+      const tag = e.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+      if (e.key === 'ArrowLeft') setDate(d => shiftDate(d, -1))
+      else if (e.key === 'ArrowRight') setDate(d => (d < shiftDate(today(), 7) ? shiftDate(d, 1) : d))
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [adding, editingLog, editingGroup, editingTarget, copying])
+
   async function handleDrop(meal) {
     setDragOverMeal(null)
     const id = dragId
@@ -172,30 +190,32 @@ export default function FoodView() {
       </div>
 
       <div className="date-nav">
-        <button onClick={() => setDate(d => shiftDate(d, -1))} aria-label="Previous day">‹</button>
-        <label className="date-nav-label">
-          {date === today() ? 'Today' : formatDisplayDate(date)}
-          <input
-            type="date"
-            className="date-nav-input"
-            value={date}
-            max={shiftDate(today(), 7)}
-            onChange={e => e.target.value && setDate(e.target.value)}
-            // Desktop Chrome only opens the native picker on its calendar
-            // icon, not anywhere else in the field — unlike mobile, which
-            // opens on any tap. This is a direct handler on the real input
-            // reacting to a genuine click, not the pointer-events:none +
-            // detached-trigger pattern the CSS comment above warns is flaky
-            // on Android, so it's safe to add alongside the default behaviour.
-            onClick={e => e.target.showPicker?.()}
-            aria-label="Pick a date"
-          />
-        </label>
-        <button
-          onClick={() => setDate(d => shiftDate(d, 1))}
-          disabled={date >= shiftDate(today(), 7)}
-          aria-label="Next day"
-        >›</button>
+        <div className="date-nav-center">
+          <button onClick={() => setDate(d => shiftDate(d, -1))} aria-label="Previous day">‹</button>
+          <label className="date-nav-label">
+            {date === today() ? 'Today' : formatDisplayDate(date)}
+            <input
+              type="date"
+              className="date-nav-input"
+              value={date}
+              max={shiftDate(today(), 7)}
+              onChange={e => e.target.value && setDate(e.target.value)}
+              // Desktop Chrome only opens the native picker on its calendar
+              // icon, not anywhere else in the field — unlike mobile, which
+              // opens on any tap. This is a direct handler on the real input
+              // reacting to a genuine click, not the pointer-events:none +
+              // detached-trigger pattern the CSS comment above warns is flaky
+              // on Android, so it's safe to add alongside the default behaviour.
+              onClick={e => e.target.showPicker?.()}
+              aria-label="Pick a date"
+            />
+          </label>
+          <button
+            onClick={() => setDate(d => shiftDate(d, 1))}
+            disabled={date >= shiftDate(today(), 7)}
+            aria-label="Next day"
+          >›</button>
+        </div>
         <button
           className="date-nav-copy"
           onClick={() => setCopying({ logs, label: 'Copy day' })}

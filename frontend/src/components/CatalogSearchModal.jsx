@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { searchCatalog, ensureFoodFromCatalog } from '../food/api.js'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
+import { useEscapeClose } from '../modalKeys.js'
 
 /**
  * Search the local Open Food Facts mirror and promote a hit into `foods`.
@@ -11,6 +12,7 @@ import KcalCol from './KcalCol.jsx'
  * row to update rather than a bare catalog row.
  */
 export default function CatalogSearchModal({ onPicked, onClose }) {
+  useEscapeClose(onClose)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)

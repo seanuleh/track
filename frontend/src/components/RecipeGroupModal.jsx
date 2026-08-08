@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { updateLogGroupMeal, scaleLogGroup, deleteLogGroup } from '../food/api.js'
+import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -15,6 +16,7 @@ const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
  * resets to 1 after each save rather than tracking a running total.
  */
 export default function RecipeGroupModal({ entry, onSaved, onClose }) {
+  useEscapeClose(onClose)
   const [meal, setMeal] = useState(entry.items[0]?.meal || 'snack')
   const [servings, setServings] = useState('1')
   const [saving, setSaving] = useState(false)
@@ -59,7 +61,7 @@ export default function RecipeGroupModal({ entry, onSaved, onClose }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={onFormKeyDown}>
           <div className="food-hint">
             {entry.items.length} ingredient{entry.items.length === 1 ? '' : 's'} — edit individual amounts from the Recipes tab.
           </div>

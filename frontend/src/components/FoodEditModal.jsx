@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { createFood, updateFood, deleteFood, countLogsForFood, extractNutritionFromImage } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
+import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 // Keeps the upload small and the vision model fast — a nutrition panel is
 // legible from a phone camera well below full resolution.
@@ -33,6 +34,7 @@ function fileToResizedBase64(file) {
  * at the time.
  */
 export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
+  useEscapeClose(onClose)
   const isNew = !food
   const [form, setForm] = useState(() => formFromFood(food))
   const [saving, setSaving] = useState(false)
@@ -115,7 +117,7 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={onFormKeyDown}>
           <input
             ref={fileInputRef}
             type="file"

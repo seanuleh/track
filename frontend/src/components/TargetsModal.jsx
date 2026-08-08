@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { setTarget } from '../food/api.js'
 import { today } from '../dates.js'
+import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 /**
  * Sets a new daily target, effective from today. Never edits an existing
@@ -9,6 +10,7 @@ import { today } from '../dates.js'
  * the old one.
  */
 export default function TargetsModal({ current, onSaved, onClose }) {
+  useEscapeClose(onClose)
   const [kcal, setKcal] = useState(current?.kcal != null ? String(current.kcal) : '')
   const [protein, setProtein] = useState(current?.protein != null ? String(current.protein) : '')
   const [fat, setFat] = useState(current?.fat != null ? String(current.fat) : '')
@@ -40,7 +42,7 @@ export default function TargetsModal({ current, onSaved, onClose }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={onFormKeyDown}>
           <div className="food-hint">
             Applies from today onward — days already logged keep whatever target was in
             effect then.

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { createEntry, updateEntry } from '../api.js'
 import { today } from '../dates.js'
+import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 const MEDICATIONS = ['Mounjaro', 'WeGovy']
 
 export default function AddEditModal({ entry, lastWeight, lastMedication, lastDose, onSave, onClose }) {
+  useEscapeClose(onClose)
   const initMed  = entry ? (entry.medication || '') : (lastMedication || '')
   const initDose = entry ? (entry.dose_mg != null ? String(entry.dose_mg) : '') : (lastDose != null ? String(lastDose) : '')
 
@@ -51,7 +53,7 @@ export default function AddEditModal({ entry, lastWeight, lastMedication, lastDo
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={onFormKeyDown}>
           <div className="form-row-2">
             <div className="form-group form-group--compact">
               <label className="form-label">Weight (kg)</label>

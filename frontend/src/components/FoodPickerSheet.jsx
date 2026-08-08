@@ -6,6 +6,7 @@ import {
 import Scanner from './Scanner.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
 import RecipeLogModal from './RecipeLogModal.jsx'
+import { useEscapeClose } from '../modalKeys.js'
 
 // Per-serving kcal for a recipe — same math as RecipesView, duplicated rather
 // than imported because it's a private helper there, not part of the API surface.
@@ -35,6 +36,7 @@ async function recipeKcal(recipe, foodCache) {
  * Open Food Facts mirror — same ranking as the old diary search.
  */
 export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
+  useEscapeClose(onClose)
   const [query, setQuery] = useState('')
   const [mine, setMine] = useState([])
   const [catalog, setCatalog] = useState([])

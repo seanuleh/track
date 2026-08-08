@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFood, logFood, updateLog, deleteLog, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 import { today, shiftDate } from '../dates.js'
+import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -25,6 +26,7 @@ export function defaultMeal() {
  *                      `foods`, making it a one-time cost per item.
  */
 export default function FoodEntryModal({ food, catalog, barcode, log, date: presetDate, meal: presetMeal, onSaved, onDeleted, onClose }) {
+  useEscapeClose(onClose)
   // Editing an existing log: the food it points at, not a fresh lookup.
   const isEditing = !!log
   food = food || catalog || (isEditing ? log.expand?.food : null) || null
@@ -117,7 +119,7 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={onFormKeyDown}>
           {isManual ? (
             <>
               <div className="food-hint">
