@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { getLogsForDate, deleteLog, updateLogMeal, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
 import FoodPickerSheet from './FoodPickerSheet.jsx'
 import FAB from './FAB.jsx'
+import MacroLine from './MacroLine.jsx'
+import KcalCol from './KcalCol.jsx'
 import { today, shiftDate } from '../dates.js'
 
 const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -83,7 +85,17 @@ export default function FoodView() {
 
       <div className="date-nav">
         <button onClick={() => setDate(d => shiftDate(d, -1))} aria-label="Previous day">‹</button>
-        <span>{date === today() ? 'Today' : date}</span>
+        <label className="date-nav-label">
+          {date === today() ? 'Today' : date}
+          <input
+            type="date"
+            className="date-nav-input"
+            value={date}
+            max={today()}
+            onChange={e => e.target.value && setDate(e.target.value)}
+            aria-label="Pick a date"
+          />
+        </label>
         <button
           onClick={() => setDate(d => shiftDate(d, 1))}
           disabled={date >= today()}
@@ -106,7 +118,8 @@ export default function FoodView() {
             <div className="log-list">
               {items.map(log => {
                 const food = log.expand?.food
-                const m = macrosFor(food, gramsFor(log, food))
+                const grams = gramsFor(log, food)
+                const kcal = macrosFor(food, grams).kcal
                 return (
                   <div
                     key={log.id}
@@ -123,7 +136,10 @@ export default function FoodView() {
                         {food?.brand ? ` · ${food.brand}` : ''}
                       </div>
                     </div>
-                    <div className="log-kcal">{Math.round(m.kcal)}</div>
+                    <div className="log-stats">
+                      <MacroLine food={food || {}} grams={grams} />
+                      <KcalCol kcal={food ? kcal : null} suffix="" />
+                    </div>
                   </div>
                 )
               })}

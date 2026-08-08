@@ -51,7 +51,7 @@ body {
 
 /* ── Header ──────────────────────────────── */
 .header {
-  padding: 48px 0 32px;
+  padding: 20px 0;
 }
 
 .header-inner {
@@ -501,7 +501,11 @@ body {
   margin-bottom: 12px;
 }
 
-.search-results--sheet {
+/* Compounded with the base class so this wins on specificity rather than
+   source order — .search-results (position: absolute) is defined later in
+   this file and was silently overriding the plain .search-results--sheet
+   rule, leaving sheet results invisible/clipped inside the modal. */
+.search-results.search-results--sheet {
   position: static;
   box-shadow: none;
   margin-bottom: 14px;
@@ -604,6 +608,32 @@ body {
 .btn-ghost:hover {
   background: var(--surface2);
   color: var(--text);
+}
+
+.btn-sm {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+/* The Foods manager's tap-to-reveal row: macros slide out, Edit/Add/Cancel
+   slide in from the same slot. Enter-only animation — simpler than a true
+   two-stage exit+enter, and reads the same at this speed. */
+@keyframes quickActionsIn {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+.log-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  animation: quickActionsIn 0.18s ease-out;
+}
+
+.log-quick-cancel {
+  font-size: 14px;
 }
 
 /* ── States ──────────────────────────────── */
@@ -824,6 +854,27 @@ body {
   border-radius: 50%;
   font-size: 18px;
   line-height: 1;
+  cursor: pointer;
+}
+
+.date-nav-label {
+  position: relative;
+  cursor: pointer;
+}
+
+/* Visually invisible but a real, directly-tappable input — not
+   pointer-events:none with a JS-triggered showPicker(). That combination is
+   flaky on Android Chrome: the native date sheet can attach to nothing and
+   get stuck open, empty, after the label's click handler already ran. Letting
+   the browser's own default click-to-open behaviour fire on a genuine (if
+   invisible) input avoids that entirely. */
+.date-nav-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: none;
   cursor: pointer;
 }
 

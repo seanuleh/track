@@ -204,9 +204,26 @@ Rules: user can only see/edit their own entries (`@request.auth.id = user`).
 ## UI
 
 Three tabs — **Diary, Foods, Weight**, opening on Diary. Diary is date-scoped and
-disposable; Foods is the date-less library where definitions are curated. The Foods tab
-deliberately has **no logging affordance** — the diary owns logging. The diary's tab key
-is still `food` in localStorage so the stored preference survived the rename.
+disposable; Foods is the date-less library where definitions are curated. The diary's tab
+key is still `food` in localStorage so the stored preference survived the rename.
+
+The Foods tab's "no logging affordance" rule (curation only, diary owns logging) was
+**reversed 2026-08-08, Sean's call**: tapping a food card now slides its macro line away
+and reveals Edit/Add/✕ in its place. Add opens `FoodEntryModal` with no `date` prop, which
+is how the modal knows to render its own editable date field (defaulting to today) instead
+of trusting a fixed day from the caller — the diary's picker sheet still passes `date`
+fixed, so it never sees that field. Edit still opens the existing `FoodEditModal`.
+
+Diary log cards (`FoodView.jsx`) render macros with the same `MacroLine`/`KcalCol`
+components as the Foods manager, scaled to the logged amount (`gramsFor(log, food)`)
+rather than per-100g or the default portion — visually identical to a Foods row, but
+reporting what was actually eaten.
+
+The diary's date label opens a native date picker (`<input type="date">`, visually
+invisible, overlaid on the label). It must stay a real, directly-tappable input —
+`pointer-events: none` plus a JS-triggered `showPicker()` is flaky on Android Chrome and
+can leave the native sheet stuck open and empty. Let the browser's default click-to-open
+behaviour fire instead.
 
 ### Weight tab
 - **Header**: current weight large + delta badge (green/red) vs selected window

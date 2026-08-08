@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { createFood, logFood, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
+import { today } from '../dates.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
 // Guess the meal from the clock so the common case needs no taps.
-function defaultMeal() {
+export function defaultMeal() {
   const h = new Date().getHours()
   if (h < 10) return 'breakfast'
   if (h < 15) return 'lunch'
@@ -23,7 +24,7 @@ function defaultMeal() {
  *                      Food Facts, so capture the label by hand. Saved to
  *                      `foods`, making it a one-time cost per item.
  */
-export default function FoodEntryModal({ food, catalog, barcode, date, meal: presetMeal, onSaved, onClose }) {
+export default function FoodEntryModal({ food, catalog, barcode, date: presetDate, meal: presetMeal, onSaved, onClose }) {
   // A catalog row has the same macro shape as a food, so everything below
   // treats it as one — only the save path differs.
   food = food || catalog || null
@@ -37,6 +38,10 @@ export default function FoodEntryModal({ food, catalog, barcode, date, meal: pre
   const [amount, setAmount] = useState(() => String(initial.amount))
   // A meal tapped on the picker sheet is already decided — no need to ask again.
   const [meal, setMeal] = useState(presetMeal || defaultMeal)
+  // The diary always knows the day it's logging into and passes it fixed; a
+  // caller with no day context (the Foods manager's quick-add) gets an
+  // editable field here instead, defaulting to today.
+  const [entryDate, setEntryDate] = useState(presetDate || today())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -75,7 +80,7 @@ export default function FoodEntryModal({ food, catalog, barcode, date, meal: pre
         // Promote now that it's actually being logged.
         target = await ensureFoodFromCatalog(catalog)
       }
-      await logFood({ date, foodId: target.id, amount: a, unit, food: target, meal })
+      await logFood({ date: entryDate, foodId: target.id, amount: a, unit, food: target, meal })
       onSaved()
     } catch (err) {
       setError(err.message)
@@ -108,6 +113,20 @@ export default function FoodEntryModal({ food, catalog, barcode, date, meal: pre
             <div className="food-hint">
               {food.brand ? `${food.brand} · ` : ''}
               {food.kcal != null ? `${Math.round(food.kcal)} kcal per 100 g` : 'No energy data on record'}
+            </div>
+          )}
+
+          {!presetDate && (
+            <div className="form-group form-group--compact">
+              <label className="form-label">Date</label>
+              <input
+                className="form-input form-input--compact"
+                type="date"
+                value={entryDate}
+                max={today()}
+                onChange={e => e.target.value && setEntryDate(e.target.value)}
+                required
+              />
             </div>
           )}
 

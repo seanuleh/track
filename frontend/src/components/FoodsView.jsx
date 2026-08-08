@@ -3,6 +3,7 @@ import { listFoods, setFavourite, resolveBarcode, portionOf, hasOwnPortion, gram
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
 import FoodEditModal from './FoodEditModal.jsx'
+import FoodEntryModal from './FoodEntryModal.jsx'
 import CatalogSearchModal from './CatalogSearchModal.jsx'
 import Scanner from './Scanner.jsx'
 import FAB from './FAB.jsx'
@@ -27,6 +28,8 @@ export default function FoodsView() {
   const [scanning, setScanning] = useState(false)
   const [searchingCatalog, setSearchingCatalog] = useState(false)
   const [status, setStatus] = useState(null)
+  const [expandedId, setExpandedId] = useState(null) // food.id showing Edit/Add/Cancel instead of macros
+  const [quickAdd, setQuickAdd] = useState(null) // { food } for FoodEntryModal, opened from Add
 
   // Debounced so typing doesn't fire a request per keystroke.
   const [debounced, setDebounced] = useState('')
@@ -130,7 +133,11 @@ export default function FoodsView() {
               const portion = portionOf(food)
               const portionGrams = gramsFor(portion, food)
               return (
-              <div key={food.id} className="log-card" onClick={() => setEditing({ food })}>
+              <div
+                key={food.id}
+                className="log-card"
+                onClick={() => setExpandedId(id => (id === food.id ? null : food.id))}
+              >
                 <button
                   className={`fav-star${food.favourite ? ' active' : ''}`}
                   onClick={e => toggleFav(e, food)}
@@ -154,15 +161,32 @@ export default function FoodsView() {
                     {` · ${food.source || 'manual'}`}
                   </div>
                 </div>
-                <div className="log-stats">
-                  <MacroLine food={food} grams={portionGrams} />
-                  <KcalCol
-                    kcal={food.kcal == null || portionGrams == null
-                      ? null
-                      : food.kcal * portionGrams / 100}
-                    suffix="/portion"
-                  />
-                </div>
+                {expandedId === food.id ? (
+                  <div className="log-quick-actions" onClick={e => e.stopPropagation()}>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing({ food })}>
+                      Edit
+                    </button>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setQuickAdd({ food })}>
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn log-quick-cancel"
+                      aria-label="Cancel"
+                      onClick={() => setExpandedId(null)}
+                    >✕</button>
+                  </div>
+                ) : (
+                  <div className="log-stats">
+                    <MacroLine food={food} grams={portionGrams} />
+                    <KcalCol
+                      kcal={food.kcal == null || portionGrams == null
+                        ? null
+                        : food.kcal * portionGrams / 100}
+                      suffix="/portion"
+                    />
+                  </div>
+                )}
               </div>
               )
             })}
@@ -199,8 +223,16 @@ export default function FoodsView() {
             <FoodEditModal
               food={editing.food}
               barcode={editing.barcode}
-              onSaved={() => { setEditing(null); setLoading(true); load(1, true) }}
+              onSaved={() => { setEditing(null); setExpandedId(null); setLoading(true); load(1, true) }}
               onClose={() => setEditing(null)}
+            />
+          )}
+
+          {quickAdd && (
+            <FoodEntryModal
+              food={quickAdd.food}
+              onSaved={() => { setQuickAdd(null); setExpandedId(null); setStatus('Logged.') }}
+              onClose={() => setQuickAdd(null)}
             />
           )}
         </>

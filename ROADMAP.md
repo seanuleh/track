@@ -268,8 +268,16 @@ amount). `updateRecipe` was added for this — it didn't exist before.
 
 Items are `{ food, amount, unit }` since §1 — so a recipe can hold "1 scoop" of protein
 powder next to "34 g" of oats, and dividing by `servings` works either way. `logRecipe`
-still reads a legacy `grams` key as a fallback, and is still written but unused — **still
-missing: a "log one serving" action reachable from the diary.**
+still reads a legacy `grams` key as a fallback, and is still written but unused.
+
+**"Log one serving" reachable from the diary — ✅ done 2026-08-08**, but as a direct
+one-tap log, not edit-before-log. `FoodPickerSheet.jsx` lists recipes (fetched once,
+per-serving kcal precomputed via a local `recipeKcal` helper — a duplicate of
+`RecipesView`'s `totalsFor`, not imported, since that helper is private to the view)
+alongside foods, both before typing and filtered client-side against the search query.
+Tapping one calls `logRecipe` immediately with the clock-guessed meal (or the sheet's
+locked meal, same as a single food). **Edit-before-log below is still not built** — this
+covers "log it as-is" only, not the Creami swap-an-ingredient case.
 
 **Log flow must be edit-before-log**: tapping a recipe opens its item list pre-filled,
 you swap or add rows, then confirm. This was chosen over two rejected alternatives:

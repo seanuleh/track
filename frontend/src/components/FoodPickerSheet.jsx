@@ -1,7 +1,26 @@
 import { useState, useEffect } from 'react'
-import { searchFoods, searchCatalog, getRecentFoods, getFavouriteFoods, resolveBarcode } from '../food/api.js'
+import {
+  searchFoods, searchCatalog, getRecentFoods, getFavouriteFoods, resolveBarcode,
+  getRecipes, logRecipe, getFood, gramsFor, macrosFor,
+} from '../food/api.js'
 import Scanner from './Scanner.jsx'
-import FoodEntryModal from './FoodEntryModal.jsx'
+import FoodEntryModal, { defaultMeal } from './FoodEntryModal.jsx'
+
+// Per-serving kcal for a recipe — same math as RecipesView, duplicated rather
+// than imported because it's a private helper there, not part of the API surface.
+async function recipeKcal(recipe, foodCache) {
+  const items = Array.isArray(recipe.items) ? recipe.items : []
+  const servings = Number(recipe.servings) || 1
+  await Promise.all(items.map(async it => {
+    if (foodCache.has(it.food)) return
+    foodCache.set(it.food, await getFood(it.food).catch(() => null))
+  }))
+  const kcal = items.reduce((sum, it) => {
+    const food = foodCache.get(it.food)
+    return sum + macrosFor(food, gramsFor(it, food)).kcal
+  }, 0)
+  return kcal / servings
+}
 
 /**
  * The single entry point for "add something" — replaces the old top-of-day
@@ -20,14 +39,34 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
   const [catalog, setCatalog] = useState([])
   const [recents, setRecents] = useState([])
   const [favourites, setFavourites] = useState([])
+  const [recipes, setRecipes] = useState([])
+  const [recipeKcals, setRecipeKcals] = useState({}) // recipe.id -> per-serving kcal
   const [scanning, setScanning] = useState(false)
   const [status, setStatus] = useState(null)
   const [entry, setEntry] = useState(null) // { food, catalog, barcode } for FoodEntryModal
+  const [logging, setLogging] = useState(null) // recipe.id currently being logged
 
   useEffect(() => {
     getRecentFoods(8).then(setRecents).catch(() => {})
     getFavouriteFoods(20).then(setFavourites).catch(() => {})
+    getRecipes().then(async list => {
+      setRecipes(list)
+      const foodCache = new Map()
+      const entries = await Promise.all(list.map(async r => [r.id, await recipeKcal(r, foodCache)]))
+      setRecipeKcals(Object.fromEntries(entries))
+    }).catch(() => {})
   }, [])
+
+  async function handleLogRecipe(recipe) {
+    setLogging(recipe.id)
+    try {
+      await logRecipe(recipe, { date, meal: meal || defaultMeal() })
+      onLogged()
+    } catch (err) {
+      setStatus('Failed to log recipe — ' + err.message)
+      setLogging(null)
+    }
+  }
 
   useEffect(() => {
     if (!query.trim()) { setMine([]); setCatalog([]); return }
@@ -39,7 +78,9 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
         setMine(a)
         const known = new Set(a.map(f => f.barcode).filter(Boolean))
         setCatalog(b.filter(c => !known.has(c.barcode)))
-      } catch { /* a failed search shouldn't block the sheet */ }
+      } catch (err) {
+        setStatus('Search failed — ' + err.message)
+      }
     }, 200)
     return () => { cancelled = true; clearTimeout(t) }
   }, [query])
@@ -76,7 +117,30 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
   // Favourites not already surfaced by recents, so the same food isn't listed twice.
   const recentIds = new Set(recents.map(f => f.id))
   const favouritesOnly = favourites.filter(f => !recentIds.has(f.id))
-  const showBrowse = !query.trim() && (recents.length > 0 || favouritesOnly.length > 0)
+  const showBrowse = !query.trim() && (recents.length > 0 || favouritesOnly.length > 0 || recipes.length > 0)
+
+  // Client-filtered — the recipe library is small (dozens, not thousands),
+  // so a server round-trip per keystroke isn't worth it.
+  const q = query.trim().toLowerCase()
+  const matchedRecipes = q ? recipes.filter(r => (r.name || '').toLowerCase().includes(q)) : recipes
+
+  function recipeButton(r) {
+    const kcal = recipeKcals[r.id]
+    return (
+      <button
+        key={r.id}
+        type="button"
+        className="search-result"
+        disabled={logging === r.id}
+        onClick={() => handleLogRecipe(r)}
+      >
+        <span className="sr-name">{r.name}</span>
+        <span className="sr-meta">
+          {logging === r.id ? 'Logging…' : (kcal != null ? `${Math.round(kcal)} kcal/serving` : '—')}
+        </span>
+      </button>
+    )
+  }
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -105,8 +169,11 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
         {status && <div className="food-status">{status}</div>}
 
         {query.trim() ? (
-          (mine.length > 0 || catalog.length > 0) && (
+          (mine.length > 0 || catalog.length > 0 || matchedRecipes.length > 0) && (
             <div className="search-results search-results--sheet">
+              {matchedRecipes.length > 0 && <div className="sr-divider">Recipes</div>}
+              {matchedRecipes.map(recipeButton)}
+              {mine.length > 0 && matchedRecipes.length > 0 && <div className="sr-divider">Foods</div>}
               {mine.map(f => (
                 <button key={f.id} type="button" className="search-result" onClick={() => setEntry({ food: f })}>
                   <span className="sr-name">{f.name}</span>
@@ -150,6 +217,8 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
                 </span>
               </button>
             ))}
+            {recipes.length > 0 && <div className="sr-divider">Recipes</div>}
+            {recipes.map(recipeButton)}
           </div>
         )}
 
