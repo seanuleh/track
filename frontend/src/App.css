@@ -200,6 +200,34 @@ body {
   padding: 8px 0 14px;
 }
 
+.section-title--meal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 2px;
+}
+
+.meal-add-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: none;
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.meal-add-btn:hover {
+  background: var(--accent);
+  color: white;
+}
+
 .entry-list {
   display: flex;
   flex-direction: column;
@@ -465,6 +493,25 @@ body {
 .modal-close:hover {
   background: var(--surface2);
   color: var(--text);
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Sheet variants: no absolute positioning, the sheet itself already scrolls
+   and caps height, so the dropdown-over-content trick the diary's inline
+   search used isn't needed here. */
+.food-search--sheet {
+  margin-bottom: 12px;
+}
+
+.search-results--sheet {
+  position: static;
+  box-shadow: none;
+  margin-bottom: 14px;
 }
 
 .form-group {

@@ -23,7 +23,7 @@ function defaultMeal() {
  *                      Food Facts, so capture the label by hand. Saved to
  *                      `foods`, making it a one-time cost per item.
  */
-export default function FoodEntryModal({ food, catalog, barcode, date, onSaved, onClose }) {
+export default function FoodEntryModal({ food, catalog, barcode, date, meal: presetMeal, onSaved, onClose }) {
   // A catalog row has the same macro shape as a food, so everything below
   // treats it as one — only the save path differs.
   food = food || catalog || null
@@ -35,7 +35,8 @@ export default function FoodEntryModal({ food, catalog, barcode, date, onSaved, 
   const initial = portionOf(food)
   const [unit, setUnit] = useState(initial.unit)
   const [amount, setAmount] = useState(() => String(initial.amount))
-  const [meal, setMeal] = useState(defaultMeal)
+  // A meal tapped on the picker sheet is already decided — no need to ask again.
+  const [meal, setMeal] = useState(presetMeal || defaultMeal)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -143,21 +144,23 @@ export default function FoodEntryModal({ food, catalog, barcode, date, onSaved, 
             )}
           </div>
 
-          <div className="form-group form-group--compact">
-            <label className="form-label">Meal</label>
-            <div className="meal-pills">
-              {MEALS.map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`meal-pill${meal === m ? ' active' : ''}`}
-                  onClick={() => setMeal(m)}
-                >
-                  {m}
-                </button>
-              ))}
+          {!presetMeal && (
+            <div className="form-group form-group--compact">
+              <label className="form-label">Meal</label>
+              <div className="meal-pills">
+                {MEALS.map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`meal-pill${meal === m ? ' active' : ''}`}
+                    onClick={() => setMeal(m)}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="macro-preview">
             <div><strong>{Math.round(preview.kcal)}</strong><span>kcal</span></div>

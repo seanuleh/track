@@ -130,6 +130,39 @@ export async function setFavourite(id, favourite) {
 }
 
 /**
+ * Foods you've logged recently, most-recent-first, deduped.
+ *
+ * Read from `food_logs` rather than a "last used" column on `foods` — logging
+ * is already the signal, so there's nothing extra to keep in sync. Overfetches
+ * logs (3x limit) since the same food repeats across entries and dedup can
+ * otherwise starve the result short of `limit`.
+ */
+export async function getRecentFoods(limit = 8) {
+  const rows = await pb.collection('food_logs').getList(1, limit * 3, {
+    sort: '-created',
+    expand: 'food',
+  })
+  const seen = new Set()
+  const out = []
+  for (const log of rows.items) {
+    const food = log.expand?.food
+    if (!food || seen.has(food.id)) continue
+    seen.add(food.id)
+    out.push(food)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+export async function getFavouriteFoods(limit = 20) {
+  const rows = await pb.collection('foods').getList(1, limit, {
+    filter: 'favourite = true',
+    sort: 'name',
+  })
+  return rows.items
+}
+
+/**
  * How many logs reference this food.
  *
  * `foods` is deliberately not cascade-delete: deleting a food that history
