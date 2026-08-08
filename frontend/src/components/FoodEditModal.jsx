@@ -1,6 +1,26 @@
-import { useState } from 'react'
-import { createFood, updateFood, deleteFood, countLogsForFood } from '../food/api.js'
+import { useState, useRef } from 'react'
+import { createFood, updateFood, deleteFood, countLogsForFood, extractNutritionFromImage } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
+
+// Keeps the upload small and the vision model fast — a nutrition panel is
+// legible from a phone camera well below full resolution.
+const MAX_DIM = 1024
+
+function fileToResizedBase64(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1])
+    }
+    img.onerror = reject
+    img.src = URL.createObjectURL(file)
+  })
+}
 
 /**
  * Create or edit a food definition.
@@ -17,6 +37,34 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
   const [form, setForm] = useState(() => formFromFood(food))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [scanning, setScanning] = useState(false)
+  const fileInputRef = useRef(null)
+
+  async function handlePhoto(e) {
+    const file = e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+
+    setScanning(true)
+    setError(null)
+    try {
+      const base64 = await fileToResizedBase64(file)
+      const extracted = await extractNutritionFromImage(base64)
+      // Only fill fields the model actually read — never stomp a value the
+      // user already typed with a blank guess.
+      setForm(f => {
+        const next = { ...f }
+        for (const [key, val] of Object.entries(extracted)) {
+          if (val != null) next[key] = String(val)
+        }
+        return next
+      })
+    } catch (err) {
+      setError('Could not read label: ' + err.message)
+    } finally {
+      setScanning(false)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -68,6 +116,24 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={handlePhoto}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ width: '100%', marginBottom: '0.75rem' }}
+            onClick={() => fileInputRef.current.click()}
+            disabled={scanning}
+          >
+            {scanning ? 'Reading label…' : 'Scan nutrition panel'}
+          </button>
+
           <FoodForm form={form} onChange={setForm} autoFocus={isNew} showExtras />
 
           {!isNew && food.barcode && (

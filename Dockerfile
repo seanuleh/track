@@ -23,6 +23,7 @@ COPY --from=frontend-builder /app/dist /pb/pb_public
 COPY pocketbase/entrypoint.sh /pb/entrypoint.sh
 RUN chmod +x /pb/entrypoint.sh
 COPY pocketbase/pb_migrations/ /pb/pb_migrations/
+COPY pocketbase/pb_hooks/ /pb/pb_hooks/
 
 EXPOSE 8090
 ENTRYPOINT ["/pb/entrypoint.sh"]

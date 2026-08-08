@@ -191,6 +191,33 @@ export async function countLogsForFood(foodId) {
  *
  * Returns { food, origin }, origin being 'cache' | 'catalog' | 'off' | null.
  */
+/**
+ * Snap a nutrition panel and get back per-100g macros, via the local
+ * `pb_hooks/vision.pb.js` proxy to Ollama (qwen2.5vl) — never Anthropic, so
+ * this costs nothing and never touches an API key or CLI subscription.
+ *
+ * `imageBase64` is raw base64, no data-URL prefix. Field names match the
+ * `foods` schema so the caller can spread the result straight into form state.
+ * Missing/unreadable fields come back absent, not zero — the caller must not
+ * treat a gap as "confirmed zero".
+ */
+export async function extractNutritionFromImage(imageBase64) {
+  const result = await pb.send('/api/vision/nutrition', {
+    method: 'POST',
+    body: { image: imageBase64 },
+  })
+  return {
+    kcal: result.kcal_per_100 ?? null,
+    protein: result.protein_g_per_100 ?? null,
+    fat: result.fat_g_per_100 ?? null,
+    carbs: result.carbs_g_per_100 ?? null,
+    fiber: result.fiber_g_per_100 ?? null,
+    sugar: result.sugar_g_per_100 ?? null,
+    sodium: result.sodium_mg_per_100 ?? null,
+    serving_g: result.serving_g_or_ml ?? null,
+  }
+}
+
 export async function resolveBarcode(barcode) {
   const cached = await findFoodByBarcode(barcode)
   if (cached) return { food: cached, origin: 'cache' }

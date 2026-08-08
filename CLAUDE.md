@@ -90,8 +90,9 @@ track/
 ├── README.md
 ├── CLAUDE.md
 ├── pocketbase/
-│   └── entrypoint.sh        # Idempotent init: admin + users collection + weight_entries
-│                            # Starts PB with --publicDir only (no hooks)
+│   ├── entrypoint.sh        # Idempotent init: admin + users collection + weight_entries
+│   └── pb_hooks/
+│       └── vision.pb.js     # POST /api/vision/nutrition — proxies a label photo to Ollama
 └── frontend/
     ├── package.json         # react 18, recharts, pocketbase sdk, vite
     ├── vite.config.js       # Dev proxy: /api → localhost:8090
@@ -113,7 +114,27 @@ track/
             └── FAB.jsx            # Fixed + button
 ```
 
-No `pb_hooks/` — the app is hook-free. Auth is handled by the cf-auth sidecar outside the container.
+Auth is handled by the cf-auth sidecar outside the container — no auth code in the app itself.
+
+One JSVM hook exists: `pb_hooks/vision.pb.js`, `POST /api/vision/nutrition`, record-auth only.
+It exists solely because the browser can reach `track` but not `ollama` — both sit on the
+internal `pirate` docker network, only the container can call the model directly. It proxies
+a base64 JPEG to `qwen2.5vl:7b` on the shared Ollama instance (`OLLAMA_URL` env, defaults to
+`http://ollama:11434`) and returns extracted per-100g macros. Local model deliberately, not
+Anthropic — no API key, no separate billing, and Claude usage/quota changes can't break it.
+Evaluated against 3 real AU nutrition panels (milk, cheese, chocolate) with 8/8 fields exact
+on every one — no accuracy gap found against Claude Haiku on the same images. A denser real
+label (rice crackers, with Gluten/Monounsaturated/Polyunsaturated/Trans Fats sub-rows) then
+row-shifted the read in production — kJ copied straight into kcal, sub-row values landing in
+the wrong fields — so the prompt now forces an explicit transcribe-named-rows-only step before
+emitting JSON, and warns by name about the sub-rows to skip. Retested against a reconstruction
+of the failing label with all 8 fields exact; **still prefill-only, glance at the numbers
+before saving** — this fix is not a proof against every future dense layout.
+
+**JSVM gotcha**: use `$apis.requestInfo(c).data` to read the parsed JSON body, not
+`c.bindBody(new DynamicModel(...))` — the latter fails with a generic
+`{"code":400,"message":"Something went wrong..."}` on PocketBase 0.22.22 for reasons that
+never surfaced in the container logs. Confirmed via a minimal debug route before diagnosing.
 
 ## PocketBase Collections
 
