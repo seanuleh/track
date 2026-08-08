@@ -81,7 +81,23 @@ food rather than editing the old one. Not worth building for.
 Each step leans on the ones above it. The first two are load-bearing — doing anything
 else first means redoing it.
 
-### 1. Serving units — **blocks everything else**
+### 1. Serving units — ✅ **done 2026-08-08** (`1786152675_serving_units.js`)
+
+Shipped as: `foods.unit_label` + `foods.unit_g` (grams in one such unit), and
+`food_logs.amount` + `food_logs.unit` (`'g'` | `'unit'`). Macros stayed per 100 g —
+that is only the *storage* basis; the unit is how an amount is *expressed*. Covers all
+three cases Sean named: `34` + `g` (chicken), `1` + `unit` of a `scoop`/`block`, and
+`135` + `unit` of `ml` (milk is `unit_label: 'ml'`, `unit_g: 1.03`).
+
+`gramsFor(log, food)` resolves an amount to grams **at render time** rather than baking
+it into the row, so fixing a mis-measured `unit_g` corrects every past log — the same
+correction-propagation rule the table below states for macros. `formatAmount` renders
+"1 scoop" / "135 ml" / "34 g". The old `grams` column is still written but never read.
+
+Existing logs were backfilled to `unit: 'g'` (all 10 were grams by definition). The
+Cronometer records described below still carry their fictional `100 g == 1 unit` grams
+— Sean's call was to wipe and re-enter them rather than migrate, which the Foods tab
+(§4) makes easy. Historical context follows.
 
 Surfaced while importing a real Cronometer day. Most items were unit-based — "1 Pack",
 "3 wrap", "0.5 each", "2 cookie" — with **no gram weight on the label**. `foods` stores
@@ -96,13 +112,9 @@ Affected records are tagged `source: 'manual'` with a `raw.basis` string spellin
 the basis used, plus `raw.imported_from: 'cronometer'`. They are findable and
 migratable.
 
-The real fix is a unit on `foods` — something like `unit_label` plus `unit_g` (null when
-the unit has no gram equivalent) — and letting `food_logs` record either grams or units.
-
-Why this is first: **protein powder is scoops.** Recipes are unusable while every
+Why this was first: **protein powder is scoops.** Recipes are unusable while every
 ingredient is pinned to a fake 100 g basis, and a "1 scoop" ingredient is exactly the
-case that breaks. It also gets worse with delay — every workaround record needs
-rewriting, and the cache only grows.
+case that breaks.
 
 ### 2. The picker sheet, and fixing the input flow
 
@@ -169,6 +181,10 @@ No logging affordances here beyond convenience — the diary owns logging.
 **Schema and API already exist and work; there is no UI.** See `recipes` in the
 migration, and `createRecipe` / `getRecipes` / `logRecipe` / `deleteRecipe` in
 `food/api.js`. `logRecipe` is written and unused.
+
+Items are `{ food, amount, unit }` since §1 — so a recipe can hold "1 scoop" of protein
+powder next to "34 g" of oats, and dividing by `servings` works either way. `logRecipe`
+still reads a legacy `grams` key as a fallback.
 
 To build: a recipe list, a builder (picker → item list → servings), and a "log one
 serving" action reachable from the diary.
@@ -253,8 +269,10 @@ are the food-specific ones:
   (`recipes.items`) until `1786113033_json_field_max_size.js` fixed it. It went
   unnoticed because the end-to-end test had `raw` stripped from its payload — **test
   json fields with actual content.**
-- **Macros are stored per 100 g** (pending §1). Every source normalises to that basis on
-  ingestion, so a serving is one multiply (`macrosFor`).
+- **Macros are stored per 100 g.** Every source normalises to that basis on ingestion,
+  so a serving is one multiply (`macrosFor`). This is unchanged by §1 — units are how an
+  amount is *expressed*, not how nutrition is *stored*. Resolve amount → grams with
+  `gramsFor` first, then multiply. Never read `food_logs.grams` directly.
 - **Missing macros are `null`, not `0`.** "Unknown" and "genuinely zero" must not be
   conflated, or totals quietly under-report. `FoodEntryModal` preserves this: a blank
   field stays blank.

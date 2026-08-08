@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFood, logFood, macrosFor } from '../food/api.js'
+import { createFood, logFood, macrosFor, gramsFor } from '../food/api.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -29,33 +29,49 @@ const MACRO_FIELDS = [
 export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }) {
   const isManual = !food
 
-  const [grams, setGrams] = useState(() => String(food?.serving_g || 100))
+  // A food that defines a unit (scoop, block, ml) defaults to one of them;
+  // everything else defaults to grams, prefilled with the pack's serving.
+  const hasUnit = !!food?.unit_label
+  const [unit, setUnit] = useState(hasUnit ? 'unit' : 'g')
+  const [amount, setAmount] = useState(() =>
+    hasUnit ? '1' : String(food?.serving_g || 100)
+  )
   const [meal, setMeal] = useState(defaultMeal)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   // Manual-entry fields. Macros are per 100 g, matching how they're stored.
+  // unit_label/unit_g are optional: they let this food later be logged as
+  // "1 scoop" or "135 ml" instead of a weight.
   const [form, setForm] = useState({
     name: '', brand: '', kcal: '', protein: '', fat: '', carbs: '',
+    unit_label: '', unit_g: '',
   })
 
   const setField = (key, value) => setForm(f => ({ ...f, [key]: value }))
 
-  const preview = macrosFor(
-    isManual
-      ? {
-          kcal: Number(form.kcal), protein: Number(form.protein),
-          fat: Number(form.fat), carbs: Number(form.carbs),
-        }
-      : food,
-    grams
-  )
+  // While entering a new food, its unit comes from the form, not the record.
+  const draft = isManual
+    ? {
+        kcal: Number(form.kcal), protein: Number(form.protein),
+        fat: Number(form.fat), carbs: Number(form.carbs),
+        unit_label: form.unit_label, unit_g: parseFloat(form.unit_g),
+      }
+    : food
+
+  const grams = gramsFor({ amount, unit }, draft)
+  const preview = macrosFor(draft, grams)
+  const canUseUnits = isManual ? !!form.unit_label.trim() : hasUnit
+  const unitName = (isManual ? form.unit_label : food?.unit_label) || 'unit'
 
   async function handleSubmit(e) {
     e.preventDefault()
-    const g = parseFloat(grams)
-    if (isNaN(g) || g <= 0) { setError('Enter a valid amount.'); return }
+    const a = parseFloat(amount)
+    if (isNaN(a) || a <= 0) { setError('Enter a valid amount.'); return }
     if (isManual && !form.name.trim()) { setError('Give the food a name.'); return }
+    if (unit === 'unit' && !(parseFloat(isManual ? form.unit_g : food.unit_g) > 0)) {
+      setError(`Set how many grams are in one ${unitName}.`); return
+    }
 
     setSaving(true)
     setError(null)
@@ -73,9 +89,11 @@ export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }
           protein: form.protein === '' ? null : parseFloat(form.protein),
           fat: form.fat === '' ? null : parseFloat(form.fat),
           carbs: form.carbs === '' ? null : parseFloat(form.carbs),
+          unit_label: form.unit_label.trim(),
+          unit_g: form.unit_g === '' ? null : parseFloat(form.unit_g),
         })
       }
-      await logFood({ date, foodId: target.id, grams: g, meal })
+      await logFood({ date, foodId: target.id, amount: a, unit, food: target, meal })
       onSaved()
     } catch (err) {
       setError(err.message)
@@ -122,6 +140,32 @@ export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }
                 />
               </div>
 
+              <div className="food-hint">
+                Optional: a natural unit, so you can log this as “1 scoop” or
+                “135 ml” instead of a weight.
+              </div>
+
+              <div className="form-row-2">
+                <div className="form-group form-group--compact">
+                  <label className="form-label">Unit name</label>
+                  <input
+                    className="form-input form-input--compact"
+                    placeholder="scoop, block, ml"
+                    value={form.unit_label}
+                    onChange={e => setField('unit_label', e.target.value)}
+                  />
+                </div>
+                <div className="form-group form-group--compact">
+                  <label className="form-label">Grams per {unitName}</label>
+                  <input
+                    className="form-input form-input--compact"
+                    type="number" inputMode="decimal" step="any" min="0"
+                    value={form.unit_g}
+                    onChange={e => setField('unit_g', e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="food-hint">Per 100 g, from the nutrition panel</div>
 
               <div className="form-row-2">
@@ -146,15 +190,36 @@ export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }
           )}
 
           <div className="form-group form-group--compact">
-            <label className="form-label">Amount (g)</label>
-            <input
-              className="form-input form-input--compact"
-              type="number" inputMode="decimal" step="any" min="0"
-              value={grams}
-              onChange={e => setGrams(e.target.value)}
-              autoFocus={!isManual}
-              required
-            />
+            <label className="form-label">Amount</label>
+            <div className="amount-row">
+              <input
+                className="form-input form-input--compact"
+                type="number" inputMode="decimal" step="any" min="0"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                autoFocus={!isManual}
+                required
+              />
+              {/* Grams are always available; the unit toggle appears only once
+                  the food actually defines one. */}
+              <div className="unit-toggle">
+                <button
+                  type="button"
+                  className={`meal-pill${unit === 'g' ? ' active' : ''}`}
+                  onClick={() => setUnit('g')}
+                >g</button>
+                {canUseUnits && (
+                  <button
+                    type="button"
+                    className={`meal-pill${unit === 'unit' ? ' active' : ''}`}
+                    onClick={() => setUnit('unit')}
+                  >{unitName}</button>
+                )}
+              </div>
+            </div>
+            {unit === 'unit' && grams != null && (
+              <div className="food-hint">= {Math.round(grams * 10) / 10} g</div>
+            )}
           </div>
 
           <div className="form-group form-group--compact">

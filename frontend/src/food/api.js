@@ -55,11 +55,23 @@ export async function getLogsForDate(date) {
   })
 }
 
-export async function logFood({ date, foodId, grams, meal }) {
+/**
+ * Log an amount of a food, expressed either in grams or in the food's own
+ * natural unit (`unit: 'unit'` — scoops, blocks, ml, wraps).
+ *
+ * `grams` is written too, so the row still makes sense to anything reading the
+ * old field, but nothing computes from it — see gramsFor.
+ */
+export async function logFood({ date, foodId, amount, unit = 'g', food, meal }) {
+  const n = Number(amount)
+  // Only a unit-based amount needs the record; grams are already grams.
+  if (!food && unit === 'unit') food = await pb.collection('foods').getOne(foodId)
   return pb.collection('food_logs').create({
     date,
     food: foodId,
-    grams: Number(grams),
+    amount: n,
+    unit,
+    grams: gramsFor({ amount: n, unit }, food),
     meal: meal || '',
     user: pb.authStore.model.id,
   })
@@ -92,6 +104,9 @@ export async function deleteRecipe(id) {
  * Log one serving of a recipe by expanding it into individual food_logs rows.
  * Expanding at log time (rather than storing a reference) means editing a
  * recipe later never rewrites history that was already logged.
+ *
+ * Items carry their own unit — a recipe can hold "1 scoop" of protein powder
+ * alongside "34 g" of oats. Dividing by servings works either way.
  */
 export async function logRecipe(recipe, { date, meal }) {
   const servings = Number(recipe.servings) || 1
@@ -102,14 +117,45 @@ export async function logRecipe(recipe, { date, meal }) {
       logFood({
         date,
         foodId: item.food,
-        grams: Number(item.grams) / servings,
+        amount: Number(item.amount ?? item.grams) / servings,
+        unit: item.unit || 'g',
         meal,
       })
     )
   )
 }
 
-// ── macro maths ──────────────────────────────────────────────────────────
+// ── amounts, units and macro maths ───────────────────────────────────────
+
+/**
+ * Resolve a log's amount to grams.
+ *
+ * Deliberately computed from the *current* food record rather than read from
+ * the stored `grams`: fixing a food's unit_g (a mis-measured scoop, say)
+ * should correct every log that used it, exactly as fixing its macros does.
+ *
+ * A unit-based log for a food with no unit_g has no gram equivalent — returns
+ * null rather than guessing, so macros come out as "unknown", not zero.
+ */
+export function gramsFor(log, food) {
+  const amount = Number(log?.amount ?? log?.grams) || 0
+  if (log?.unit !== 'unit') return amount
+
+  const unitG = Number(food?.unit_g)
+  return unitG > 0 ? amount * unitG : null
+}
+
+/** How the amount reads back to a human: "34 g", "1 scoop", "135 ml". */
+export function formatAmount(log, food) {
+  const amount = Number(log?.amount ?? log?.grams) || 0
+  const rounded = Math.round(amount * 10) / 10
+  if (log?.unit !== 'unit') return `${rounded} g`
+
+  const label = food?.unit_label || 'unit'
+  // 'ml' reads as "135 ml"; a countable unit pluralises — "2 scoops".
+  const plural = label.length > 2 && rounded !== 1 ? `${label}s` : label
+  return `${rounded} ${plural}`
+}
 
 // Every macro on `foods` is per 100 g, so a serving is one multiply.
 export function macrosFor(food, grams) {
@@ -126,7 +172,7 @@ export function macrosFor(food, grams) {
 export function totalMacros(logs) {
   return logs.reduce(
     (acc, log) => {
-      const m = macrosFor(log.expand?.food, log.grams)
+      const m = macrosFor(log.expand?.food, gramsFor(log, log.expand?.food))
       acc.kcal += m.kcal
       acc.protein += m.protein
       acc.fat += m.fat

@@ -126,12 +126,21 @@ multiply. Filled on demand from Open Food Facts barcode lookups, plus manual ent
 | brand | text | |
 | source | text | `off` \| `afcd` \| `manual` |
 | serving_g | number | pack's stated serving, when declared |
+| unit_label | text | name of one natural unit — `scoop`, `block`, `ml`, `wrap` |
+| unit_g | number | grams in one such unit (milk: `1.03` per ml). Empty = no gram equivalent |
 | kcal, protein, fat, carbs, fiber, sugar | number | per 100 g |
 | sodium | number | mg per 100 g |
 | raw | json | untouched upstream payload, for later backfill |
 
 **`food_logs`** (base collection) — one row per thing eaten: `date` (YYYY-MM-DD),
-`food` (relation → foods), `grams`, `meal`, `user`. Indexed on `(user, date)`.
+`food` (relation → foods), `amount`, `unit`, `meal`, `user`. Indexed on `(user, date)`.
+
+`unit` is `g` (amount is grams — "34 g of chicken") or `unit` (amount counts the
+food's `unit_label` — "1 scoop", "135 ml"). **Grams are resolved at render time**
+by `gramsFor(log, food)`, not read from a stored value, so correcting a food's
+`unit_g` fixes every log that used it — same rule as correcting its macros. The
+legacy `grams` column is still written for compatibility but nothing computes
+from it.
 
 **`recipes`** (base collection) — `name`, `items` (json `[{food, grams}]`), `servings`,
 `user`. A recipe is a **template**: logging it expands into individual `food_logs` rows,

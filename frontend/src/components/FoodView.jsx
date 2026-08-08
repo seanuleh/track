@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getLogsForDate, deleteLog, resolveBarcode, searchFoods, macrosFor, totalMacros } from '../food/api.js'
+import { getLogsForDate, deleteLog, resolveBarcode, searchFoods, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
 import Scanner from './Scanner.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
 import { today, shiftDate } from '../dates.js'
@@ -148,14 +148,15 @@ export default function FoodView() {
           <div className="section-title">{meal}</div>
           <div className="log-list">
             {items.map(log => {
-              const m = macrosFor(log.expand?.food, log.grams)
+              const food = log.expand?.food
+              const m = macrosFor(food, gramsFor(log, food))
               return (
                 <div key={log.id} className="log-card" onClick={() => handleDelete(log.id)}>
                   <div className="log-main">
-                    <div className="log-name">{log.expand?.food?.name || 'Unknown food'}</div>
+                    <div className="log-name">{food?.name || 'Unknown food'}</div>
                     <div className="log-meta">
-                      {Math.round(log.grams)} g
-                      {log.expand?.food?.brand ? ` · ${log.expand.food.brand}` : ''}
+                      {formatAmount(log, food)}
+                      {food?.brand ? ` · ${food.brand}` : ''}
                     </div>
                   </div>
                   <div className="log-kcal">{Math.round(m.kcal)}</div>

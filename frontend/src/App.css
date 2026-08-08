@@ -872,6 +872,30 @@ body {
   gap: 6px;
 }
 
+/* Amount + unit toggle sit on one line: the number takes the space, the
+   g/unit pills stay just wide enough to read. */
+.amount-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.amount-row .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.unit-toggle {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.unit-toggle .meal-pill {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+}
+
 .meal-pill {
   flex: 1;
   padding: 8px 4px;
