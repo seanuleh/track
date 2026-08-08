@@ -25,3 +25,22 @@ export function shiftDate(date, days) {
   d.setDate(d.getDate() + days)
   return toLocalISO(d)
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function ordinal(n) {
+  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`
+  switch (n % 10) {
+    case 1: return `${n}st`
+    case 2: return `${n}nd`
+    case 3: return `${n}rd`
+    default: return `${n}th`
+  }
+}
+
+/** Format a `YYYY-MM-DD` string as "Mon, 1st Jan 2026" — the diary's date label. */
+export function formatDisplayDate(date) {
+  const d = new Date(date + 'T00:00:00') // parsed as local midnight
+  return `${WEEKDAYS[d.getDay()]}, ${ordinal(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}

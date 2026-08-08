@@ -400,7 +400,17 @@ export async function logRecipe(recipe, { date, meal }) {
 /**
  * The target in effect on `date` — the newest row with effective_date <=
  * date, so raising a target later never rescores days already logged
- * against the old one. Returns null if none has ever been set.
+ * against the old one.
+ *
+ * Dates *before* the very first target ever set have nothing <= them to
+ * find; falling through to that first target anyway (rather than null)
+ * means the targets panel is the diary's default look everywhere once
+ * you've ever set a target, not just from the day you happened to set it.
+ * There's no "true" target for those older days regardless — this is a
+ * display choice, not a correction, so it doesn't conflict with the
+ * no-rescoring rule above.
+ *
+ * Returns null only if no target has ever been set at all.
  */
 export async function getTargetForDate(date) {
   try {
@@ -408,6 +418,11 @@ export async function getTargetForDate(date) {
       pb.filter('effective_date <= {:date}', { date }),
       { sort: '-effective_date' }
     )
+  } catch (err) {
+    if (err.status !== 404) throw err
+  }
+  try {
+    return await pb.collection('daily_targets').getFirstListItem('', { sort: 'effective_date' })
   } catch (err) {
     if (err.status === 404) return null
     throw err

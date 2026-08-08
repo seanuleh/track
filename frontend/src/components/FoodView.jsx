@@ -7,7 +7,7 @@ import TargetsModal from './TargetsModal.jsx'
 import FAB from './FAB.jsx'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
-import { today, shiftDate } from '../dates.js'
+import { today, shiftDate, formatDisplayDate } from '../dates.js'
 
 const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -172,7 +172,7 @@ export default function FoodView() {
       <div className="date-nav">
         <button onClick={() => setDate(d => shiftDate(d, -1))} aria-label="Previous day">‹</button>
         <label className="date-nav-label">
-          {date === today() ? 'Today' : date}
+          {date === today() ? 'Today' : formatDisplayDate(date)}
           <input
             type="date"
             className="date-nav-input"
