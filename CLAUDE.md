@@ -110,7 +110,10 @@ track/
             ├── FoodsView.jsx      # Foods tab — the library/manager
             ├── FoodForm.jsx       # Shared food definition fields + form↔record mapping
             ├── FoodEditModal.jsx  # Create/edit/delete a food definition
-            ├── FoodEntryModal.jsx # Log an amount; manual entry falls back to FoodForm
+            ├── FoodEntryModal.jsx # Log/edit an amount; manual entry falls back to FoodForm
+            ├── RecipeGroupModal.jsx # Edit/delete a logged recipe as one unit (meal, servings eaten)
+            ├── RecipeLogModal.jsx # Edit-before-log: adjust a recipe's items before it's logged
+            ├── TargetsModal.jsx   # Set a new daily kcal/macro target, effective from today
             └── FAB.jsx            # Fixed + button
 ```
 
@@ -205,9 +208,36 @@ by `gramsFor(log, food)`, not read from a stored value, so correcting a food's
 legacy `grams` column is still written for compatibility but nothing computes
 from it.
 
-**`recipes`** (base collection) — `name`, `items` (json `[{food, grams}]`), `servings`,
-`user`. A recipe is a **template**: logging it expands into individual `food_logs` rows,
-so later edits to a recipe never rewrite already-logged history.
+`recipe_group` (text) + `recipe_name` (text), both optional — set on every row a
+recipe expands into (`logRecipeItems` in `food/api.js`), sharing one
+`crypto.randomUUID()` per logging call. `recipe_name` is copied at log time rather
+than a relation, same "expand by value" rule as everything else here: editing or
+deleting the recipe later must not change what a past day says was eaten. The diary
+(`FoodView.jsx`) groups rows sharing a `recipe_group` back into one card so a logged
+recipe shows as itself, not as its expanded ingredients; tapping it opens
+`RecipeGroupModal` (reassign meal, scale servings eaten, delete the whole serving) —
+individual ingredient amounts are edited through the recipe itself, not here.
+
+**`recipes`** (base collection) — `name`, `items` (json `[{food, amount, unit}]`),
+`servings`, `user`. A recipe is a **template**: logging it expands into individual
+`food_logs` rows, so later edits to a recipe never rewrite already-logged history.
+
+Logging from the diary is **edit-before-log** (`RecipeLogModal.jsx`): tapping a recipe
+opens its item list pre-filled at one serving, where amounts/units can be adjusted and
+ingredients swapped (remove + re-add via `FoodPicker`) before anything is written —
+this is the Ninja Creami case ("usually chocolate whey, tonight vanilla casein")
+without duplicating the recipe or editing its saved definition. `logRecipe` (log-as-is,
+still used nowhere directly but kept as the base case) and `RecipeLogModal`'s edited
+path both funnel through the shared `logRecipeItems`.
+
+**`daily_targets`** (base collection) — `effective_date` (YYYY-MM-DD), `kcal`
+(required), `protein`/`fat`/`carbs` (optional), `user`. Date-effective: `setTarget`
+always creates a new row rather than updating one in place, and `getTargetForDate`
+resolves the newest row with `effective_date <= date`, so raising a target next month
+can't rescore days already logged against the old one. Dates before the very first
+target ever set fall back to that first target anyway (a display choice, not a
+rescoring) so the targets panel is the diary's default look everywhere once a target
+has ever been set, not only from the day it happened to be created.
 
 **`weight_entries`** (base collection)
 
@@ -238,13 +268,31 @@ fixed, so it never sees that field. Edit still opens the existing `FoodEditModal
 Diary log cards (`FoodView.jsx`) render macros with the same `MacroLine`/`KcalCol`
 components as the Foods manager, scaled to the logged amount (`gramsFor(log, food)`)
 rather than per-100g or the default portion — visually identical to a Foods row, but
-reporting what was actually eaten.
+reporting what was actually eaten. Tapping a card opens `FoodEntryModal` in edit mode
+(amount/unit/meal/date, plus Delete) instead of deleting on tap — grouped recipe cards
+open `RecipeGroupModal` instead (see the `food_logs` collection notes above).
 
 The diary's date label opens a native date picker (`<input type="date">`, visually
 invisible, overlaid on the label). It must stay a real, directly-tappable input —
 `pointer-events: none` plus a JS-triggered `showPicker()` is flaky on Android Chrome and
 can leave the native sheet stuck open and empty. Let the browser's default click-to-open
-behaviour fire instead.
+behaviour fire instead. Desktop Chrome is the exception: it only opens the picker on the
+input's own calendar icon, not anywhere else in the (invisible, full-width) field, so the
+input also carries an explicit `onClick={e => e.target.showPicker?.()}` — safe alongside
+the default behaviour because it's a direct handler on the real input reacting to a
+genuine click, not the detached-trigger pattern the paragraph above warns about. The
+label text itself is `formatDisplayDate` from `dates.js` ("Sat, 8th Aug 2026"), not the
+raw `YYYY-MM-DD` string — `today()` still renders as "Today".
+
+### Daily targets
+
+`TargetsModal.jsx` sets a new kcal (required) + optional protein/fat/carb target,
+effective from today (see the `daily_targets` collection notes above for why it's
+always a new row). While a target exists for the day being viewed, the diary header
+replaces the plain kcal hero + macro row with a 4-row panel (Energy/Protein/Carbs/Fat,
+each showing consumed/goal, a percentage, and a coloured bar) plus a small "N kcal
+left/over" badge next to the edit-target pencil icon in the title row. Falls back to
+the old plain hero display only if no target has ever been set at all.
 
 ### Weight tab
 - **Header**: current weight large + delta badge (green/red) vs selected window
