@@ -337,7 +337,13 @@ Two commercial options were considered and rejected for now:
 - **USDA FoodData Central** — free and huge, but US portions and fortification differ
   enough to mislead for AU products. Last resort.
 
-### 10. Preferred serving size — replace the /100g default in list views
+### 10. Preferred serving size — replace the /100g default in list views — ✅ **done 2026-08-08**
+
+Shipped as `foods.portion_amount` + `foods.portion_unit` (see `CLAUDE.md`'s "Unit vs pack
+serving vs portion" section for the three-way distinction). `portionOf(food)` resolves
+with fallback: stored portion → 1 unit → `serving_g` → 100 g. List rows show macros
+against the resolved portion with a `/portion` suffix; unset portions render dimmed
+(`.portion-unset`) rather than silently defaulting.
 
 Raised by Sean straight after §4b shipped the macro/kJ display: those numbers are
 currently always **per 100 g**, which isn't how anyone thinks about a food they actually
