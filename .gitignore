@@ -2,3 +2,5 @@
 pb_data/
 frontend/node_modules/
 frontend/dist/
+__pycache__/
+*.pyc
