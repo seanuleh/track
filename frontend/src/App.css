@@ -84,15 +84,33 @@ body {
 }
 
 .header-edit-btn {
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
   color: var(--accent);
-  background: none;
+  background: var(--accent-soft);
   border: none;
+  border-radius: 50%;
   padding: 0;
   cursor: pointer;
+}
+
+.header-weight--remaining {
+  font-size: 56px;
+  letter-spacing: -2px;
+  margin-bottom: 4px;
+}
+
+.header-weight--remaining span {
+  font-size: 20px;
+}
+
+.header-weight--over,
+.header-weight--over span {
+  color: var(--danger);
 }
 
 /* ── Targets panel (replaces the plain kcal hero once a target is set) ── */
