@@ -91,7 +91,7 @@ body {
 
 .header-remaining {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--success);
   white-space: nowrap;

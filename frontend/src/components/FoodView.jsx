@@ -113,7 +113,7 @@ export default function FoodView() {
             <div className="header-title-row-right">
               {target && (
                 <span className={`header-remaining${totals.kcal > target.kcal ? ' header-remaining--over' : ''}`}>
-                  {Math.round(Math.abs(target.kcal - totals.kcal))} {totals.kcal > target.kcal ? 'over' : 'left'}
+                  {Math.round(Math.abs(target.kcal - totals.kcal))} kcal {totals.kcal > target.kcal ? 'over' : 'left'}
                 </span>
               )}
               <button
