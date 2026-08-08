@@ -395,6 +395,40 @@ export async function logRecipe(recipe, { date, meal }) {
   )
 }
 
+// ── daily_targets ────────────────────────────────────────────────────────
+
+/**
+ * The target in effect on `date` — the newest row with effective_date <=
+ * date, so raising a target later never rescores days already logged
+ * against the old one. Returns null if none has ever been set.
+ */
+export async function getTargetForDate(date) {
+  try {
+    return await pb.collection('daily_targets').getFirstListItem(
+      pb.filter('effective_date <= {:date}', { date }),
+      { sort: '-effective_date' }
+    )
+  } catch (err) {
+    if (err.status === 404) return null
+    throw err
+  }
+}
+
+/**
+ * Set a new target, effective from `date` (defaults to today) onward. Always
+ * a new row, never an update-in-place — see getTargetForDate.
+ */
+export async function setTarget({ kcal, protein, fat, carbs, date }) {
+  return pb.collection('daily_targets').create({
+    effective_date: date,
+    kcal: Number(kcal),
+    protein: protein === '' || protein == null ? null : Number(protein),
+    fat: fat === '' || fat == null ? null : Number(fat),
+    carbs: carbs === '' || carbs == null ? null : Number(carbs),
+    user: pb.authStore.model.id,
+  })
+}
+
 // ── amounts, units and macro maths ───────────────────────────────────────
 
 /**

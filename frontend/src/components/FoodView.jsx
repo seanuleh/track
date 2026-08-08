@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getLogsForDate, updateLogMeal, updateLogGroupMeal, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
+import { getLogsForDate, getTargetForDate, updateLogMeal, updateLogGroupMeal, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
 import FoodPickerSheet from './FoodPickerSheet.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
 import RecipeGroupModal from './RecipeGroupModal.jsx'
+import TargetsModal from './TargetsModal.jsx'
 import FAB from './FAB.jsx'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
@@ -13,18 +14,22 @@ const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
 export default function FoodView() {
   const [date, setDate] = useState(today)
   const [logs, setLogs] = useState([])
+  const [target, setTargetState] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const [adding, setAdding] = useState(false) // FAB-opened picker sheet; meal is chosen inside
   const [editingLog, setEditingLog] = useState(null) // a single log tapped for edit/delete
   const [editingGroup, setEditingGroup] = useState(null) // a recipe card tapped for edit/delete
+  const [editingTarget, setEditingTarget] = useState(false)
   const [dragId, setDragId] = useState(null)
   const [dragOverMeal, setDragOverMeal] = useState(null)
 
   const load = useCallback(async () => {
     try {
-      setLogs(await getLogsForDate(date))
+      const [dayLogs, dayTarget] = await Promise.all([getLogsForDate(date), getTargetForDate(date)])
+      setLogs(dayLogs)
+      setTargetState(dayTarget)
       setError(null)
     } catch (err) {
       setError(err.message)
@@ -103,7 +108,12 @@ export default function FoodView() {
     <>
       <div className="header">
         <div className="header-inner">
-          <div className="header-title">Calories</div>
+          <div className="header-title-row">
+            <div className="header-title">Calories</div>
+            <button type="button" className="header-edit-btn" onClick={() => setEditingTarget(true)}>
+              {target ? 'Edit target' : 'Set target'}
+            </button>
+          </div>
           <div className="header-weight">
             {Math.round(totals.kcal)}<span>kcal</span>
           </div>
@@ -112,6 +122,21 @@ export default function FoodView() {
             <span><strong>{totals.fat.toFixed(0)}g</strong> fat</span>
             <span><strong>{totals.carbs.toFixed(0)}g</strong> carbs</span>
           </div>
+          {target && (
+            <div className="target-row">
+              <div className="target-bar">
+                <div
+                  className={`target-bar-fill${totals.kcal > target.kcal ? ' target-bar-fill--over' : ''}`}
+                  style={{ width: `${Math.min(100, (totals.kcal / target.kcal) * 100)}%` }}
+                />
+              </div>
+              <span className={`target-remaining${totals.kcal > target.kcal ? ' target-remaining--over' : ''}`}>
+                {totals.kcal > target.kcal
+                  ? `${Math.round(totals.kcal - target.kcal)} over`
+                  : `${Math.round(target.kcal - totals.kcal)} left`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -243,6 +268,14 @@ export default function FoodView() {
           entry={editingGroup}
           onClose={() => setEditingGroup(null)}
           onSaved={() => { setEditingGroup(null); load() }}
+        />
+      )}
+
+      {editingTarget && (
+        <TargetsModal
+          current={target}
+          onClose={() => setEditingTarget(false)}
+          onSaved={() => { setEditingTarget(false); load() }}
         />
       )}
     </>
