@@ -63,7 +63,6 @@ export default function AddEditModal({ entry, lastWeight, lastMedication, lastDo
                 placeholder={lastWeight || '0.0'}
                 value={weight}
                 onChange={e => setWeight(e.target.value)}
-                autoFocus
                 required
               />
             </div>

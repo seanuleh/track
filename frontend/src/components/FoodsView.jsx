@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { listFoods, setFavourite, resolveBarcode, portionOf, hasOwnPortion, gramsFor, formatAmount } from '../food/api.js'
+import {
+  listFoods, setFavourite, resolveBarcode, portionOf, hasOwnPortion, gramsFor, formatAmount,
+  getRecipes, setRecipeFavourite, recipeTotals,
+} from '../food/api.js'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
 import FoodEditModal from './FoodEditModal.jsx'
@@ -8,6 +11,7 @@ import CatalogSearchModal from './CatalogSearchModal.jsx'
 import Scanner from './Scanner.jsx'
 import FAB from './FAB.jsx'
 import RecipesView from './RecipesView.jsx'
+import RecipeBuilderModal from './RecipeBuilderModal.jsx'
 
 /**
  * The Foods tab — a library, not a diary.
@@ -30,6 +34,9 @@ export default function FoodsView() {
   const [status, setStatus] = useState(null)
   const [expandedId, setExpandedId] = useState(null) // food.id showing Edit/Add/Cancel instead of macros
   const [quickAdd, setQuickAdd] = useState(null) // { food } for FoodEntryModal, opened from Add
+  const [recipes, setRecipes] = useState([])
+  const [recipeMacros, setRecipeMacros] = useState({}) // recipe.id -> per-serving macros
+  const [editingRecipe, setEditingRecipe] = useState(null) // { recipe } | { recipe: null }
 
   // Debounced so typing doesn't fire a request per keystroke.
   const [debounced, setDebounced] = useState('')
@@ -54,6 +61,34 @@ export default function FoodsView() {
 
   // A new search always restarts at page 1.
   useEffect(() => { setLoading(true); load(1, true) }, [load])
+
+  // Recipes appear in the Foods list too, so they can be favourited and found
+  // the same way — the library is small, so a full fetch each search is fine.
+  const loadRecipes = useCallback(async () => {
+    const rows = await getRecipes()
+    setRecipes(rows)
+    const foodCache = new Map()
+    const entries = await Promise.all(rows.map(async r => [r.id, await recipeTotals(r, foodCache)]))
+    setRecipeMacros(Object.fromEntries(entries))
+  }, [])
+
+  useEffect(() => { loadRecipes() }, [loadRecipes])
+
+  const matchingRecipes = recipes
+    .filter(r => !debounced.trim() || r.name.toLowerCase().includes(debounced.trim().toLowerCase()))
+    .sort((a, b) => (b.favourite === a.favourite ? a.name.localeCompare(b.name) : (b.favourite ? 1 : -1)))
+
+  async function toggleRecipeFav(e, recipe) {
+    e.stopPropagation()
+    const next = !recipe.favourite
+    setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, favourite: next } : r)))
+    try {
+      await setRecipeFavourite(recipe.id, next)
+    } catch (err) {
+      setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, favourite: !next } : r)))
+      setError(err.message)
+    }
+  }
 
   // Infinite scroll, matching the weight history list.
   const sentinelRef = useRef(null)
@@ -127,6 +162,33 @@ export default function FoodsView() {
           {loading && <div className="loading">Loading…</div>}
 
           <div className="log-list">
+            {matchingRecipes.map(recipe => (
+              <div
+                key={`recipe-${recipe.id}`}
+                className="log-card"
+                onClick={() => setEditingRecipe({ recipe })}
+              >
+                <button
+                  className={`fav-star${recipe.favourite ? ' active' : ''}`}
+                  onClick={e => toggleRecipeFav(e, recipe)}
+                  aria-label={recipe.favourite ? 'Remove favourite' : 'Mark favourite'}
+                >
+                  {recipe.favourite ? '★' : '☆'}
+                </button>
+                <div className="log-main">
+                  <div className="log-name">{recipe.name}</div>
+                  <div className="log-meta">
+                    Recipe · {(recipe.items || []).length} ingredient{(recipe.items || []).length === 1 ? '' : 's'}
+                  </div>
+                </div>
+                {recipeMacros[recipe.id] && (
+                  <div className="log-stats">
+                    <MacroLine food={recipeMacros[recipe.id]} />
+                    <KcalCol kcal={recipeMacros[recipe.id].kcal} suffix="/serving" />
+                  </div>
+                )}
+              </div>
+            ))}
             {foods.map(food => {
               // Macros are reported for the portion, not per 100 g — the number
               // that matters is what you'd actually eat.
@@ -233,6 +295,14 @@ export default function FoodsView() {
               food={quickAdd.food}
               onSaved={() => { setQuickAdd(null); setExpandedId(null); setStatus('Logged.') }}
               onClose={() => setQuickAdd(null)}
+            />
+          )}
+
+          {editingRecipe && (
+            <RecipeBuilderModal
+              recipe={editingRecipe.recipe}
+              onSaved={() => { setEditingRecipe(null); loadRecipes() }}
+              onClose={() => setEditingRecipe(null)}
             />
           )}
         </>

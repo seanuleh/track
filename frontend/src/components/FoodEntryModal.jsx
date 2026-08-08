@@ -126,7 +126,7 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
                   : 'Add a food by hand.'}
               </div>
 
-              <FoodForm form={form} onChange={setForm} autoFocus />
+              <FoodForm form={form} onChange={setForm} />
             </>
           ) : (
             <div className="food-hint">
@@ -157,7 +157,6 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
                 type="number" inputMode="decimal" step="any" min="0"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
-                autoFocus={!isManual}
                 required
               />
               {/* Grams are always available; the unit toggle appears only once

@@ -134,7 +134,7 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
             {scanning ? 'Reading label…' : 'Scan nutrition panel'}
           </button>
 
-          <FoodForm form={form} onChange={setForm} autoFocus={isNew} showExtras />
+          <FoodForm form={form} onChange={setForm} showExtras />
 
           {!isNew && food.barcode && (
             <div className="food-hint">Barcode {food.barcode} · source {food.source || 'manual'}</div>

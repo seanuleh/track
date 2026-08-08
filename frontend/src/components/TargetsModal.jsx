@@ -53,7 +53,6 @@ export default function TargetsModal({ current, onSaved, onClose }) {
               type="number" inputMode="decimal" step="any" min="0"
               value={kcal}
               onChange={e => setKcal(e.target.value)}
-              autoFocus
               required
             />
           </div>

@@ -57,7 +57,6 @@ export default function CatalogSearchModal({ onPicked, onClose }) {
             placeholder="Search by name or brand…"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            autoFocus
           />
         </div>
 

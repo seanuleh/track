@@ -379,6 +379,44 @@ export async function deleteRecipe(id) {
   return pb.collection('recipes').delete(id)
 }
 
+export async function setRecipeFavourite(id, favourite) {
+  return pb.collection('recipes').update(id, { favourite })
+}
+
+/**
+ * Sum a recipe's items into per-serving macros. Foods aren't expanded on the
+ * recipe record, so each referenced food is fetched once and cached by id —
+ * recipes commonly share ingredients (milk, protein powder), so a shared
+ * cache across recipes avoids re-fetching the same food repeatedly.
+ */
+export async function recipeTotals(recipe, foodCache = new Map()) {
+  const items = Array.isArray(recipe.items) ? recipe.items : []
+  const servings = Number(recipe.servings) || 1
+
+  await Promise.all(items.map(async it => {
+    if (foodCache.has(it.food)) return
+    foodCache.set(it.food, await getFood(it.food).catch(() => null))
+  }))
+
+  const totals = items.reduce((acc, it) => {
+    const food = foodCache.get(it.food)
+    const grams = gramsFor(it, food)
+    const m = macrosFor(food, grams)
+    acc.kcal += m.kcal
+    acc.protein += m.protein
+    acc.fat += m.fat
+    acc.carbs += m.carbs
+    return acc
+  }, { kcal: 0, protein: 0, fat: 0, carbs: 0 })
+
+  return {
+    kcal: totals.kcal / servings,
+    protein: totals.protein / servings,
+    fat: totals.fat / servings,
+    carbs: totals.carbs / servings,
+  }
+}
+
 /**
  * Log a finished list of {food, amount, unit} rows as one recipe serving,
  * expanding into individual food_logs rows sharing a recipe_group. This is

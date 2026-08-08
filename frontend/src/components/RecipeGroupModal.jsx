@@ -71,7 +71,6 @@ export default function RecipeGroupModal({ entry, onSaved, onClose }) {
               type="number" inputMode="decimal" step="any" min="0"
               value={servings}
               onChange={e => setServings(e.target.value)}
-              autoFocus
             />
           </div>
 

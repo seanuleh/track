@@ -74,7 +74,7 @@ const EXTRA_FIELDS = [
   { key: 'sodium', label: 'Sodium (mg)' },
 ]
 
-export default function FoodForm({ form, onChange, autoFocus = false, showExtras = false }) {
+export default function FoodForm({ form, onChange, showExtras = false }) {
   const set = (key, value) => onChange({ ...form, [key]: value })
   const unitName = form.unit_label.trim() || 'unit'
   const canUsePortionUnit = !!form.unit_label.trim() && parseFloat(form.unit_g) > 0
@@ -87,7 +87,6 @@ export default function FoodForm({ form, onChange, autoFocus = false, showExtras
           className="form-input form-input--compact"
           value={form.name}
           onChange={e => set('name', e.target.value)}
-          autoFocus={autoFocus}
           required
         />
       </div>

@@ -109,7 +109,6 @@ export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
               className="form-input form-input--compact"
               value={name}
               onChange={e => setName(e.target.value)}
-              autoFocus
               required
             />
           </div>

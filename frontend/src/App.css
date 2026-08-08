@@ -338,12 +338,14 @@ body {
 
 .meal-section {
   border-radius: var(--radius-sm);
+  padding: 8px;
+  margin: -8px;
   transition: background 0.15s, box-shadow 0.15s;
 }
 
 .meal-section--dragover {
-  background: rgba(59, 91, 219, 0.06);
-  box-shadow: inset 0 0 0 2px var(--accent);
+  background: rgba(59, 91, 219, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(59, 91, 219, 0.08);
 }
 
 .meal-empty {

@@ -157,13 +157,15 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
             placeholder="Search foods…"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            autoFocus
           />
         </div>
 
         <div className="food-actions">
           <button type="button" className="btn btn-ghost" onClick={() => setScanning(true)}>
             Scan barcode
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setEntry({ food: null, barcode: '' })}>
+            Create custom food
           </button>
         </div>
 
@@ -222,10 +224,6 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
             {recipes.map(recipeButton)}
           </div>
         )}
-
-        <button type="button" className="btn btn-ghost btn-block" onClick={() => setEntry({ food: null, barcode: '' })}>
-          Create custom food
-        </button>
       </div>
 
       {scanning && (
