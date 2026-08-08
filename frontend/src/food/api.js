@@ -252,7 +252,7 @@ export async function getLogsForDate(date) {
  * `grams` is written too, so the row still makes sense to anything reading the
  * old field, but nothing computes from it — see gramsFor.
  */
-export async function logFood({ date, foodId, amount, unit = 'g', food, meal }) {
+export async function logFood({ date, foodId, amount, unit = 'g', food, meal, recipeGroup, recipeName }) {
   const n = Number(amount)
   // Only a unit-based amount needs the record; grams are already grams.
   if (!food && unit === 'unit') food = await pb.collection('foods').getOne(foodId)
@@ -263,7 +263,21 @@ export async function logFood({ date, foodId, amount, unit = 'g', food, meal }) 
     unit,
     grams: gramsFor({ amount: n, unit }, food),
     meal: meal || '',
+    recipe_group: recipeGroup || '',
+    recipe_name: recipeName || '',
     user: pb.authStore.model.id,
+  })
+}
+
+/** Edit an existing log's amount, unit, meal or date — grams recomputed from `food`. */
+export async function updateLog(id, { date, amount, unit = 'g', food, meal }) {
+  const n = Number(amount)
+  return pb.collection('food_logs').update(id, {
+    date,
+    amount: n,
+    unit,
+    grams: gramsFor({ amount: n, unit }, food),
+    meal: meal || '',
   })
 }
 
@@ -271,9 +285,45 @@ export async function deleteLog(id) {
   return pb.collection('food_logs').delete(id)
 }
 
+/**
+ * Scale every ingredient row in a logged recipe by `factor` — the diary's
+ * "servings eaten" edit. Recipes aren't referenced by id from a log (see
+ * logRecipe), so there's no stored base amount to recompute from; this scales
+ * whatever is currently logged, which composes fine across repeated edits.
+ */
+export async function scaleLogGroup(recipeGroup, factor) {
+  const rows = await pb.collection('food_logs').getFullList({
+    filter: pb.filter('recipe_group = {:recipeGroup}', { recipeGroup }),
+    expand: 'food',
+  })
+  return Promise.all(rows.map(r => {
+    const amount = Number(r.amount) * factor
+    return pb.collection('food_logs').update(r.id, {
+      amount,
+      grams: gramsFor({ amount, unit: r.unit }, r.expand?.food),
+    })
+  }))
+}
+
+/** Delete every row logged together as one recipe serving. */
+export async function deleteLogGroup(recipeGroup) {
+  const rows = await pb.collection('food_logs').getFullList({
+    filter: pb.filter('recipe_group = {:recipeGroup}', { recipeGroup }),
+  })
+  return Promise.all(rows.map(r => pb.collection('food_logs').delete(r.id)))
+}
+
 /** Reassign a logged entry to a different meal — the drag-between-meals target. */
 export async function updateLogMeal(id, meal) {
   return pb.collection('food_logs').update(id, { meal })
+}
+
+/** Reassign every row in a recipe group to a different meal, as one drag target. */
+export async function updateLogGroupMeal(recipeGroup, meal) {
+  const rows = await pb.collection('food_logs').getFullList({
+    filter: pb.filter('recipe_group = {:recipeGroup}', { recipeGroup }),
+  })
+  return Promise.all(rows.map(r => pb.collection('food_logs').update(r.id, { meal })))
 }
 
 // ── recipes ──────────────────────────────────────────────────────────────
@@ -310,6 +360,9 @@ export async function deleteRecipe(id) {
 export async function logRecipe(recipe, { date, meal }) {
   const servings = Number(recipe.servings) || 1
   const items = Array.isArray(recipe.items) ? recipe.items : []
+  // Shared by every row from this call, so the diary can collapse them back
+  // into one card — crypto.randomUUID() needs no server round trip.
+  const recipeGroup = crypto.randomUUID()
 
   return Promise.all(
     items.map(item =>
@@ -319,6 +372,8 @@ export async function logRecipe(recipe, { date, meal }) {
         amount: Number(item.amount ?? item.grams) / servings,
         unit: item.unit || 'g',
         meal,
+        recipeGroup,
+        recipeName: recipe.name,
       })
     )
   )

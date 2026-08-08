@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getLogsForDate, deleteLog, updateLogMeal, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
+import { getLogsForDate, updateLogMeal, updateLogGroupMeal, macrosFor, totalMacros, gramsFor, formatAmount } from '../food/api.js'
 import FoodPickerSheet from './FoodPickerSheet.jsx'
+import FoodEntryModal from './FoodEntryModal.jsx'
+import RecipeGroupModal from './RecipeGroupModal.jsx'
 import FAB from './FAB.jsx'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
@@ -15,6 +17,8 @@ export default function FoodView() {
   const [error, setError] = useState(null)
 
   const [adding, setAdding] = useState(false) // FAB-opened picker sheet; meal is chosen inside
+  const [editingLog, setEditingLog] = useState(null) // a single log tapped for edit/delete
+  const [editingGroup, setEditingGroup] = useState(null) // a recipe card tapped for edit/delete
   const [dragId, setDragId] = useState(null)
   const [dragOverMeal, setDragOverMeal] = useState(null)
 
@@ -31,21 +35,26 @@ export default function FoodView() {
 
   useEffect(() => { load() }, [load])
 
-  async function handleDelete(id) {
-    if (!confirm('Remove this entry?')) return
-    try {
-      await deleteLog(id)
-      await load()
-    } catch (err) {
-      alert('Failed to remove: ' + err.message)
-    }
-  }
-
   async function handleDrop(meal) {
     setDragOverMeal(null)
     const id = dragId
     setDragId(null)
     if (!id) return
+
+    if (id.startsWith('group:')) {
+      const recipeGroup = id.slice('group:'.length)
+      const groupLogs = logs.filter(l => l.recipe_group === recipeGroup)
+      if (groupLogs.length === 0 || (groupLogs[0].meal || 'snack') === meal) return
+      setLogs(ls => ls.map(l => (l.recipe_group === recipeGroup ? { ...l, meal } : l)))
+      try {
+        await updateLogGroupMeal(recipeGroup, meal)
+      } catch (err) {
+        setError(err.message)
+        await load()
+      }
+      return
+    }
+
     const log = logs.find(l => l.id === id)
     if (!log || (log.meal || 'snack') === meal) return
     // Reflect the move immediately — waiting on the round trip makes the drop feel unresponsive.
@@ -60,10 +69,33 @@ export default function FoodView() {
 
   const totals = totalMacros(logs)
 
+  // Collapse rows sharing a recipe_group into one entry, so a logged recipe
+  // shows as itself in the diary rather than as its expanded ingredients.
+  // Order preserved from the original -created sort by keeping each group's
+  // position at its first row.
+  function groupLogs(items) {
+    const grouped = []
+    const seen = new Map() // recipe_group -> grouped entry
+    for (const log of items) {
+      if (!log.recipe_group) {
+        grouped.push(log)
+        continue
+      }
+      let entry = seen.get(log.recipe_group)
+      if (!entry) {
+        entry = { recipe_group: log.recipe_group, recipe_name: log.recipe_name, meal: log.meal, items: [] }
+        seen.set(log.recipe_group, entry)
+        grouped.push(entry)
+      }
+      entry.items.push(log)
+    }
+    return grouped
+  }
+
   // Every meal always gets a header, including empty ones, so it's a valid drop
   // target even before anything has ever been logged into it.
   const byMeal = MEAL_ORDER
-    .map(meal => ({ meal, items: logs.filter(l => (l.meal || 'snack') === meal) }))
+    .map(meal => ({ meal, items: groupLogs(logs.filter(l => (l.meal || 'snack') === meal)) }))
 
   if (loading) return <div className="loading">Loading…</div>
 
@@ -116,7 +148,44 @@ export default function FoodView() {
           <div className="section-title">{meal}</div>
           {items.length > 0 ? (
             <div className="log-list">
-              {items.map(log => {
+              {items.map(entry => {
+                if (entry.items) {
+                  // Grouped recipe row — sum the expanded ingredients' macros.
+                  const dragKey = `group:${entry.recipe_group}`
+                  const totals = entry.items.reduce((acc, log) => {
+                    const food = log.expand?.food
+                    const grams = gramsFor(log, food)
+                    const m = macrosFor(food, grams)
+                    acc.kcal += m.kcal || 0
+                    acc.protein += m.protein || 0
+                    acc.fat += m.fat || 0
+                    acc.carbs += m.carbs || 0
+                    return acc
+                  }, { kcal: 0, protein: 0, fat: 0, carbs: 0 })
+                  return (
+                    <div
+                      key={entry.recipe_group}
+                      className={`log-card${dragId === dragKey ? ' log-card--dragging' : ''}`}
+                      draggable
+                      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(dragKey) }}
+                      onDragEnd={() => { setDragId(null); setDragOverMeal(null) }}
+                      onClick={() => setEditingGroup(entry)}
+                    >
+                      <div className="log-main">
+                        <div className="log-name">{entry.recipe_name || 'Recipe'}</div>
+                        <div className="log-meta">
+                          {entry.items.length} ingredient{entry.items.length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                      <div className="log-stats">
+                        <MacroLine food={totals} grams={100} />
+                        <KcalCol kcal={totals.kcal} suffix="" />
+                      </div>
+                    </div>
+                  )
+                }
+
+                const log = entry
                 const food = log.expand?.food
                 const grams = gramsFor(log, food)
                 const kcal = macrosFor(food, grams).kcal
@@ -127,7 +196,7 @@ export default function FoodView() {
                     draggable
                     onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(log.id) }}
                     onDragEnd={() => { setDragId(null); setDragOverMeal(null) }}
-                    onClick={() => handleDelete(log.id)}
+                    onClick={() => setEditingLog(log)}
                   >
                     <div className="log-main">
                       <div className="log-name">{food?.name || 'Unknown food'}</div>
@@ -157,6 +226,23 @@ export default function FoodView() {
           date={date}
           onClose={() => setAdding(false)}
           onLogged={() => { setAdding(false); load() }}
+        />
+      )}
+
+      {editingLog && (
+        <FoodEntryModal
+          log={editingLog}
+          onClose={() => setEditingLog(null)}
+          onSaved={() => { setEditingLog(null); load() }}
+          onDeleted={() => { setEditingLog(null); load() }}
+        />
+      )}
+
+      {editingGroup && (
+        <RecipeGroupModal
+          entry={editingGroup}
+          onClose={() => setEditingGroup(null)}
+          onSaved={() => { setEditingGroup(null); load() }}
         />
       )}
     </>

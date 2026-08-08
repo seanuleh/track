@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFood, logFood, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
+import { createFood, logFood, updateLog, deleteLog, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 import { today } from '../dates.js'
 
@@ -24,25 +24,27 @@ export function defaultMeal() {
  *                      Food Facts, so capture the label by hand. Saved to
  *                      `foods`, making it a one-time cost per item.
  */
-export default function FoodEntryModal({ food, catalog, barcode, date: presetDate, meal: presetMeal, onSaved, onClose }) {
-  // A catalog row has the same macro shape as a food, so everything below
-  // treats it as one — only the save path differs.
-  food = food || catalog || null
-  const isManual = !food
+export default function FoodEntryModal({ food, catalog, barcode, log, date: presetDate, meal: presetMeal, onSaved, onDeleted, onClose }) {
+  // Editing an existing log: the food it points at, not a fresh lookup.
+  const isEditing = !!log
+  food = food || catalog || (isEditing ? log.expand?.food : null) || null
+  const isManual = !isEditing && !food
 
-  // Prefilled with your portion for this food — the amount you actually eat —
-  // falling back to a unit, the pack serving, then 100 g. Always overridable.
+  // Editing prefills from the log itself; a new entry prefills from your usual
+  // portion for this food — falling back to a unit, the pack serving, then
+  // 100 g. Always overridable either way.
   const hasUnit = !!food?.unit_label
-  const initial = portionOf(food)
+  const initial = isEditing ? { amount: log.amount, unit: log.unit || 'g' } : portionOf(food)
   const [unit, setUnit] = useState(initial.unit)
   const [amount, setAmount] = useState(() => String(initial.amount))
   // A meal tapped on the picker sheet is already decided — no need to ask again.
-  const [meal, setMeal] = useState(presetMeal || defaultMeal)
+  const [meal, setMeal] = useState(isEditing ? (log.meal || 'snack') : (presetMeal || defaultMeal()))
   // The diary always knows the day it's logging into and passes it fixed; a
   // caller with no day context (the Foods manager's quick-add) gets an
   // editable field here instead, defaulting to today.
-  const [entryDate, setEntryDate] = useState(presetDate || today())
+  const [entryDate, setEntryDate] = useState(isEditing ? log.date : (presetDate || today()))
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState(null)
 
   // Manual-entry fields — the same form the Foods manager uses.
@@ -69,22 +71,39 @@ export default function FoodEntryModal({ food, catalog, barcode, date: presetDat
     setSaving(true)
     setError(null)
     try {
-      let target = food
-      if (isManual) {
-        target = await createFood({
-          ...foodFromForm(form),
-          barcode: barcode || '',
-          source: 'manual',
-        })
-      } else if (catalog) {
-        // Promote now that it's actually being logged.
-        target = await ensureFoodFromCatalog(catalog)
+      if (isEditing) {
+        await updateLog(log.id, { date: entryDate, amount: a, unit, food, meal })
+      } else {
+        let target = food
+        if (isManual) {
+          target = await createFood({
+            ...foodFromForm(form),
+            barcode: barcode || '',
+            source: 'manual',
+          })
+        } else if (catalog) {
+          // Promote now that it's actually being logged.
+          target = await ensureFoodFromCatalog(catalog)
+        }
+        await logFood({ date: entryDate, foodId: target.id, amount: a, unit, food: target, meal })
       }
-      await logFood({ date: entryDate, foodId: target.id, amount: a, unit, food: target, meal })
       onSaved()
     } catch (err) {
       setError(err.message)
       setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm('Remove this entry?')) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteLog(log.id)
+      onDeleted ? onDeleted() : onSaved()
+    } catch (err) {
+      setError(err.message)
+      setDeleting(false)
     }
   }
 
@@ -191,9 +210,14 @@ export default function FoodEntryModal({ food, catalog, barcode, date: presetDat
           {error && <div className="form-error">{error}</div>}
 
           <div className="modal-actions modal-actions--compact">
+            {isEditing && (
+              <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting || saving}>
+                {deleting ? 'Removing…' : 'Delete'}
+              </button>
+            )}
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : 'Log it'}
+            <button type="submit" className="btn btn-primary" disabled={saving || deleting}>
+              {saving ? 'Saving…' : (isEditing ? 'Save' : 'Log it')}
             </button>
           </div>
         </form>
