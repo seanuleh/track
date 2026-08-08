@@ -95,38 +95,58 @@ body {
   cursor: pointer;
 }
 
-.target-row {
+/* ── Targets panel (replaces the plain kcal hero once a target is set) ── */
+.targets-panel {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.target-bar {
+.target-metric-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.target-metric-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.target-metric-values {
   flex: 1;
-  height: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.target-metric-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+.target-metric-bar {
+  height: 5px;
   border-radius: 999px;
   background: var(--surface2);
   overflow: hidden;
 }
 
-.target-bar-fill {
+.target-metric-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--success);
   transition: width 0.2s ease;
 }
 
-.target-bar-fill--over {
-  background: var(--danger);
-}
-
-.target-remaining {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--success);
-  white-space: nowrap;
-}
+.target-metric-fill--energy { background: #e8834f; }
+.target-metric-fill--protein { background: var(--success); }
+.target-metric-fill--carbs { background: #35b6c9; }
+.target-metric-fill--fat { background: #8b5cf6; }
 
 .target-remaining--over {
   color: var(--danger);

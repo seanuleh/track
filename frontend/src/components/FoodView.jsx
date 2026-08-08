@@ -114,28 +114,45 @@ export default function FoodView() {
               {target ? 'Edit target' : 'Set target'}
             </button>
           </div>
-          <div className="header-weight">
-            {Math.round(totals.kcal)}<span>kcal</span>
-          </div>
-          <div className="macro-row">
-            <span><strong>{totals.protein.toFixed(0)}g</strong> protein</span>
-            <span><strong>{totals.fat.toFixed(0)}g</strong> fat</span>
-            <span><strong>{totals.carbs.toFixed(0)}g</strong> carbs</span>
-          </div>
-          {target && (
-            <div className="target-row">
-              <div className="target-bar">
-                <div
-                  className={`target-bar-fill${totals.kcal > target.kcal ? ' target-bar-fill--over' : ''}`}
-                  style={{ width: `${Math.min(100, (totals.kcal / target.kcal) * 100)}%` }}
-                />
-              </div>
-              <span className={`target-remaining${totals.kcal > target.kcal ? ' target-remaining--over' : ''}`}>
-                {totals.kcal > target.kcal
-                  ? `${Math.round(totals.kcal - target.kcal)} over`
-                  : `${Math.round(target.kcal - totals.kcal)} left`}
-              </span>
+          {target ? (
+            <div className="targets-panel">
+              {[
+                { key: 'kcal', label: 'Energy', value: totals.kcal, goal: target.kcal, decimals: 0, unit: 'kcal', color: 'energy' },
+                { key: 'protein', label: 'Protein', value: totals.protein, goal: target.protein, decimals: 1, unit: 'g', color: 'protein' },
+                { key: 'carbs', label: 'Carbs', value: totals.carbs, goal: target.carbs, decimals: 1, unit: 'g', color: 'carbs' },
+                { key: 'fat', label: 'Fat', value: totals.fat, goal: target.fat, decimals: 1, unit: 'g', color: 'fat' },
+              ].filter(row => row.goal != null).map(row => {
+                const pct = row.goal > 0 ? Math.round((row.value / row.goal) * 100) : 0
+                return (
+                  <div className="target-metric" key={row.key}>
+                    <div className="target-metric-top">
+                      <span className="target-metric-label">{row.label}</span>
+                      <span className="target-metric-values">
+                        {row.value.toFixed(row.decimals)} / {row.goal.toFixed(row.decimals)} {row.unit}
+                      </span>
+                      <span className="target-metric-pct">{pct}%</span>
+                    </div>
+                    <div className="target-metric-bar">
+                      <div
+                        className={`target-metric-fill target-metric-fill--${row.color}`}
+                        style={{ width: `${Math.min(100, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+          ) : (
+            <>
+              <div className="header-weight">
+                {Math.round(totals.kcal)}<span>kcal</span>
+              </div>
+              <div className="macro-row">
+                <span><strong>{totals.protein.toFixed(0)}g</strong> protein</span>
+                <span><strong>{totals.fat.toFixed(0)}g</strong> fat</span>
+                <span><strong>{totals.carbs.toFixed(0)}g</strong> carbs</span>
+              </div>
+            </>
           )}
         </div>
       </div>
