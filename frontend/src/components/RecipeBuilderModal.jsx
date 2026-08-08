@@ -18,7 +18,9 @@ import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
  */
 export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
   useEscapeClose(onClose)
-  const isNew = !recipe
+  // A recipe with no `id` is a "Vary" copy: prefilled from an existing recipe
+  // but with nothing saved yet, so it must still take the create path.
+  const isNew = !recipe?.id
   const [name, setName] = useState(recipe?.name || '')
   const [servings, setServings] = useState(String(recipe?.servings || 1))
   const [items, setItems] = useState(() =>
@@ -29,20 +31,22 @@ export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
       unit: it.unit || 'g',
       kcal: null,
       unit_g: null,
+      unit_label: null,
     }))
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   // Existing rows load without macros (the recipe only stores the relation),
-  // so fetch each referenced food once to power the kcal preview.
+  // so fetch each referenced food once to power the kcal preview and show
+  // its real unit name ("scoop", "ml") instead of the literal unit type.
   useEffect(() => {
-    if (isNew) return
+    if (items.length === 0) return
     let cancelled = false
     Promise.all(items.map(it => getFood(it.food).catch(() => null))).then(foods => {
       if (cancelled) return
       setItems(prev => prev.map((it, i) => (
-        foods[i] ? { ...it, kcal: foods[i].kcal, unit_g: foods[i].unit_g } : it
+        foods[i] ? { ...it, kcal: foods[i].kcal, unit_g: foods[i].unit_g, unit_label: foods[i].unit_label } : it
       )))
     })
     return () => { cancelled = true }
@@ -55,7 +59,7 @@ export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
       {
         food: food.id, name: food.name,
         amount: food.unit_label ? '1' : '100', unit: food.unit_label ? 'unit' : 'g',
-        kcal: food.kcal, unit_g: food.unit_g,
+        kcal: food.kcal, unit_g: food.unit_g, unit_label: food.unit_label,
       },
     ])
   }
@@ -141,7 +145,7 @@ export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
                     value={it.amount}
                     onChange={e => updateItem(i, { amount: e.target.value })}
                   />
-                  <span className="ingredient-unit">{it.unit}</span>
+                  <span className="ingredient-unit">{it.unit === 'unit' ? (it.unit_label || 'unit') : it.unit}</span>
                   <button type="button" className="icon-btn danger" onClick={() => removeItem(i)}>✕</button>
                 </div>
               )

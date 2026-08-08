@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getRecipes, deleteRecipe, recipeTotals } from '../food/api.js'
 import RecipeBuilderModal from './RecipeBuilderModal.jsx'
+import RecipeLogModal from './RecipeLogModal.jsx'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
 import FAB from './FAB.jsx'
@@ -12,6 +13,9 @@ export default function RecipesView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [editing, setEditing] = useState(null) // { recipe } | { recipe: null } for new
+  const [expandedId, setExpandedId] = useState(null) // recipe.id showing Edit/Vary/Delete instead of macros
+  const [logging, setLogging] = useState(null) // { recipe } for RecipeLogModal, opened from Add
+  const [status, setStatus] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -47,10 +51,15 @@ export default function RecipesView() {
   return (
     <>
       {error && <div className="error">{error}</div>}
+      {status && <div className="food-status">{status}</div>}
 
       <div className="log-list">
         {recipes.map(recipe => (
-          <div key={recipe.id} className="log-card" onClick={() => setEditing({ recipe })}>
+          <div
+            key={recipe.id}
+            className="log-card"
+            onClick={() => setExpandedId(id => (id === recipe.id ? null : recipe.id))}
+          >
             <div className="log-main">
               <div className="log-name">{recipe.name}</div>
               <div className="log-meta">
@@ -58,13 +67,38 @@ export default function RecipesView() {
                 {' · '}{recipe.servings || 1} serving{(recipe.servings || 1) === 1 ? '' : 's'}
               </div>
             </div>
-            {totals[recipe.id] && (
-              <div className="log-stats">
-                <MacroLine food={totals[recipe.id]} />
-                <KcalCol kcal={totals[recipe.id].kcal} suffix="/serving" />
+            {expandedId === recipe.id ? (
+              <div className="log-quick-actions" onClick={e => e.stopPropagation()}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditing({ recipe }); setExpandedId(null) }}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setEditing({ recipe: { name: `${recipe.name} (variation)`, servings: recipe.servings, items: recipe.items } })
+                    setExpandedId(null)
+                  }}
+                >
+                  Vary
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => { setLogging({ recipe }); setExpandedId(null) }}
+                >
+                  Add
+                </button>
+                <button className="icon-btn danger" onClick={e => handleDelete(e, recipe)}>✕</button>
               </div>
+            ) : (
+              totals[recipe.id] && (
+                <div className="log-stats">
+                  <MacroLine food={totals[recipe.id]} />
+                  <KcalCol kcal={totals[recipe.id].kcal} suffix="/serving" />
+                </div>
+              )
             )}
-            <button className="icon-btn danger" onClick={e => handleDelete(e, recipe)}>✕</button>
           </div>
         ))}
       </div>
@@ -78,6 +112,14 @@ export default function RecipesView() {
           recipe={editing.recipe}
           onSaved={() => { setEditing(null); load() }}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {logging && (
+        <RecipeLogModal
+          recipe={logging.recipe}
+          onLogged={() => { setLogging(null); setStatus('Logged.') }}
+          onClose={() => setLogging(null)}
         />
       )}
     </>

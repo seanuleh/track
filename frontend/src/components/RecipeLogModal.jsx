@@ -2,23 +2,31 @@ import { useState, useEffect } from 'react'
 import { getFood, gramsFor, macrosFor, logRecipeItems, createRecipe } from '../food/api.js'
 import FoodPicker from './FoodPicker.jsx'
 import { defaultMeal } from './FoodEntryModal.jsx'
+import { today, shiftDate } from '../dates.js'
 import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
 /**
- * Edit-before-log: tapping a recipe in the diary opens this instead of
- * logging it immediately. Items are pre-filled at one serving (recipe
- * amounts / servings — the same math logRecipe used to do inline), then
- * freely adjusted — swap an ingredient (remove + FoodPicker add), change an
- * amount, drop one — before anything is written.
+ * Edit-before-log: tapping a recipe in the diary (or "Add" from the Foods/
+ * Recipes tab) opens this instead of logging it immediately. Items are
+ * pre-filled at one serving (recipe amounts / servings — the same math
+ * logRecipe used to do inline), then freely adjusted — swap an ingredient
+ * (remove + FoodPicker add), change an amount, drop one — before anything
+ * is written.
+ *
+ * `servingsEaten` is a separate multiplier applied to every item's amount
+ * only at submit time (same "scale on save, not live" rule as
+ * RecipeGroupModal's servings-eaten field) — so per-item amounts stay
+ * readable as one serving's worth while editing.
  *
  * Confirming calls logRecipeItems with this edited list, not the saved
  * recipe, so tweaking here never rewrites the recipe definition itself
  * (that's the Recipes tab's job) — same "expand by value" rule as logRecipe.
  */
-export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogged, onClose }) {
+export default function RecipeLogModal({ recipe, date: presetDate, meal: presetMeal, onLogged, onClose }) {
   useEscapeClose(onClose)
+  const [entryDate, setEntryDate] = useState(presetDate || today())
   const servings = Number(recipe.servings) || 1
   const [items, setItems] = useState(() =>
     (recipe.items || []).map(it => ({
@@ -28,9 +36,11 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
       unit: it.unit || 'g',
       kcal: null,
       unit_g: null,
+      unit_label: null,
     }))
   )
   const [meal, setMeal] = useState(presetMeal || defaultMeal())
+  const [servingsEaten, setServingsEaten] = useState('1')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [showSaveAs, setShowSaveAs] = useState(false)
@@ -45,7 +55,7 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
     Promise.all(items.map(it => getFood(it.food).catch(() => null))).then(foods => {
       if (cancelled) return
       setItems(prev => prev.map((it, i) => (
-        foods[i] ? { ...it, kcal: foods[i].kcal, unit_g: foods[i].unit_g } : it
+        foods[i] ? { ...it, kcal: foods[i].kcal, unit_g: foods[i].unit_g, unit_label: foods[i].unit_label } : it
       )))
     })
     return () => { cancelled = true }
@@ -72,7 +82,7 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
       {
         food: food.id, name: food.name,
         amount: food.unit_label ? '1' : '100', unit: food.unit_label ? 'unit' : 'g',
-        kcal: food.kcal, unit_g: food.unit_g,
+        kcal: food.kcal, unit_g: food.unit_g, unit_label: food.unit_label,
       },
     ])
   }
@@ -101,13 +111,15 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
   async function handleSubmit(e) {
     e.preventDefault()
     if (items.length === 0) { setError('Add at least one ingredient.'); return }
+    const factor = parseFloat(servingsEaten)
+    if (isNaN(factor) || factor <= 0) { setError('Enter a valid servings amount.'); return }
 
     setSaving(true)
     setError(null)
     try {
       await logRecipeItems(
-        items.map(it => ({ food: it.food, amount: Number(it.amount) || 0, unit: it.unit })),
-        { date, meal, recipeName: recipe.name }
+        items.map(it => ({ food: it.food, amount: (Number(it.amount) || 0) * factor, unit: it.unit })),
+        { date: entryDate, meal, recipeName: recipe.name }
       )
       onLogged()
     } catch (err) {
@@ -143,6 +155,30 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
             </div>
           )}
 
+          <div className="form-group form-group--compact">
+            <label className="form-label">Servings</label>
+            <input
+              className="form-input form-input--compact"
+              type="number" inputMode="decimal" step="any" min="0"
+              value={servingsEaten}
+              onChange={e => setServingsEaten(e.target.value)}
+            />
+          </div>
+
+          {!presetDate && (
+            <div className="form-group form-group--compact">
+              <label className="form-label">Date</label>
+              <input
+                className="form-input form-input--compact"
+                type="date"
+                value={entryDate}
+                max={shiftDate(today(), 7)}
+                onChange={e => e.target.value && setEntryDate(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
           <div className="form-label">Ingredients</div>
           <div className="log-list">
             {items.map((it, i) => {
@@ -159,7 +195,7 @@ export default function RecipeLogModal({ recipe, date, meal: presetMeal, onLogge
                     value={it.amount}
                     onChange={e => updateItem(i, { amount: e.target.value })}
                   />
-                  <span className="ingredient-unit">{it.unit}</span>
+                  <span className="ingredient-unit">{it.unit === 'unit' ? (it.unit_label || 'unit') : it.unit}</span>
                   <button type="button" className="icon-btn danger" onClick={() => removeItem(i)}>✕</button>
                 </div>
               )
