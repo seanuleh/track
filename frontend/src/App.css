@@ -872,6 +872,28 @@ body {
   gap: 6px;
 }
 
+/* Favourite star in the Foods list. Sized for a thumb without stealing width
+   from the name — the whole row is the edit target, this is the exception. */
+.fav-star {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  padding: 0 10px 0 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.fav-star.active {
+  color: #f5b301;
+}
+
+.btn-danger {
+  color: var(--danger, #e5484d);
+  margin-right: auto;
+}
+
 /* Amount + unit toggle sit on one line: the number takes the space, the
    g/unit pills stay just wide enough to read. */
 .amount-row {

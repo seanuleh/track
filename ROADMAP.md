@@ -168,13 +168,34 @@ Recommended instead, in order:
 A server-side key (FatSecret) breaks the current no-worker architecture — you'd need a
 worker sidecar, and the `fridge` app is the pattern to copy.
 
-### 4. Foods tab — the manager
+### 4. Foods tab — the manager — ✅ **done 2026-08-08**
 
-Browse, search, edit, delete. Fix wrong macros (which, per the table above, corrects
-history). Create custom foods properly rather than via the diary's fallback path.
-Mark favourites, which feed the picker's default list.
+Built **before** §2, on Sean's call, and the ordering argument in this file was wrong:
+the picker-first case is "don't build a food chooser three times", but the manager isn't
+a chooser, so there was no overlap to protect. What the two actually share is the *food
+definition form*, which §4 has now produced (`FoodForm.jsx` — fields plus
+`formFromFood` / `foodFromForm`). §2's "create custom food" reuses it rather than
+reinventing it, and `FoodEntryModal` already does.
 
-No logging affordances here beyond convenience — the diary owns logging.
+The forcing reason: §1 shipped units with no way to set `unit_label`/`unit_g` on a food
+that already existed — only on manual creation. §5/§6 were blocked on that regardless of
+the picker.
+
+Shipped: `FoodsView` (search by name/brand/barcode, favourites-first sort, infinite
+scroll, paginated so it doesn't degrade as the cache grows), `FoodEditModal`
+(create/edit/delete, all macros including fibre/sugar/sodium), `favourite` flag
+(`1786153138_food_favourites.js`), nav moved to **Diary / Foods / Weight**.
+
+Deleting a food **counts referencing logs first and names the number in the confirm** —
+`foods` is not cascade-delete, so deleting one that history points at leaves those logs
+as "Unknown food" with no macros and silently changes past totals.
+
+The Cronometer records with fictional grams were deleted (8 of 10) along with their
+logs. The two tagged `basis: true per-100 g` — chicken breast, cheese block — were real
+weights and were kept.
+
+Still open here: favourites are stored and sorted but nothing consumes them yet; that's
+§2's default list.
 
 ### 5. Recipes
 

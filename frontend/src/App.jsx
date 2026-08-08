@@ -5,6 +5,7 @@ import EntryList from './components/EntryList.jsx'
 import AddEditModal from './components/AddEditModal.jsx'
 import FAB from './components/FAB.jsx'
 import FoodView from './components/FoodView.jsx'
+import FoodsView from './components/FoodsView.jsx'
 import { toLocalISO } from './dates.js'
 import { buildColorMap, formatMedLabel, NO_MED_COLOR } from './medColors.js'
 
@@ -251,8 +252,12 @@ function WeightView() {
   )
 }
 
+// Diary and Foods are separate surfaces on purpose: the diary is date-scoped
+// and disposable, the library is date-less and curated. The 'food' key is kept
+// for the diary so the stored tab preference survives the rename.
 const TABS = [
-  { key: 'food', label: 'Food' },
+  { key: 'food', label: 'Diary' },
+  { key: 'foods', label: 'Foods' },
   { key: 'weight', label: 'Weight' },
 ]
 
@@ -373,7 +378,7 @@ export default function App() {
         // repeat swipe in the same direction.
         key={tab}
       >
-        {tab === 'weight' ? <WeightView /> : <FoodView />}
+        {tab === 'weight' ? <WeightView /> : tab === 'foods' ? <FoodsView /> : <FoodView />}
       </div>
 
       <nav

@@ -105,6 +105,11 @@ track/
             ├── WeightChart.jsx    # Recharts AreaChart, time-proportional X axis
             ├── EntryList.jsx      # Reverse-chrono cards, infinite scroll
             ├── AddEditModal.jsx   # Bottom-sheet modal
+            ├── FoodView.jsx       # Diary tab — the day's log, per-meal groups
+            ├── FoodsView.jsx      # Foods tab — the library/manager
+            ├── FoodForm.jsx       # Shared food definition fields + form↔record mapping
+            ├── FoodEditModal.jsx  # Create/edit/delete a food definition
+            ├── FoodEntryModal.jsx # Log an amount; manual entry falls back to FoodForm
             └── FAB.jsx            # Fixed + button
 ```
 
@@ -128,6 +133,7 @@ multiply. Filled on demand from Open Food Facts barcode lookups, plus manual ent
 | serving_g | number | pack's stated serving, when declared |
 | unit_label | text | name of one natural unit — `scoop`, `block`, `ml`, `wrap` |
 | unit_g | number | grams in one such unit (milk: `1.03` per ml). Empty = no gram equivalent |
+| favourite | bool | pinned to the top of the Foods manager; will seed the picker's default list |
 | kcal, protein, fat, carbs, fiber, sugar | number | per 100 g |
 | sodium | number | mg per 100 g |
 | raw | json | untouched upstream payload, for later backfill |
@@ -161,6 +167,12 @@ Rules: user can only see/edit their own entries (`@request.auth.id = user`).
 
 ## UI
 
+Three tabs — **Diary, Foods, Weight**, opening on Diary. Diary is date-scoped and
+disposable; Foods is the date-less library where definitions are curated. The Foods tab
+deliberately has **no logging affordance** — the diary owns logging. The diary's tab key
+is still `food` in localStorage so the stored preference survived the rename.
+
+### Weight tab
 - **Header**: current weight large + delta badge (green/red) vs selected window
 - **Time windows**: `1W | 1M | 3M | 6M | 1Y | 2Y | 3Y | All` pill buttons, default 3M, persisted to localStorage
 - **Chart**: Recharts AreaChart, proportional time X axis

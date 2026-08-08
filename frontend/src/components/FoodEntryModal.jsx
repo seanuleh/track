@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createFood, logFood, macrosFor, gramsFor } from '../food/api.js'
+import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -11,13 +12,6 @@ function defaultMeal() {
   if (h < 21) return 'dinner'
   return 'snack'
 }
-
-const MACRO_FIELDS = [
-  { key: 'kcal', label: 'kcal' },
-  { key: 'protein', label: 'Protein (g)' },
-  { key: 'fat', label: 'Fat (g)' },
-  { key: 'carbs', label: 'Carbs (g)' },
-]
 
 /**
  * Two modes:
@@ -40,24 +34,12 @@ export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  // Manual-entry fields. Macros are per 100 g, matching how they're stored.
-  // unit_label/unit_g are optional: they let this food later be logged as
-  // "1 scoop" or "135 ml" instead of a weight.
-  const [form, setForm] = useState({
-    name: '', brand: '', kcal: '', protein: '', fat: '', carbs: '',
-    unit_label: '', unit_g: '',
-  })
+  // Manual-entry fields — the same form the Foods manager uses.
+  const [form, setForm] = useState(() => formFromFood(null))
 
-  const setField = (key, value) => setForm(f => ({ ...f, [key]: value }))
-
-  // While entering a new food, its unit comes from the form, not the record.
-  const draft = isManual
-    ? {
-        kcal: Number(form.kcal), protein: Number(form.protein),
-        fat: Number(form.fat), carbs: Number(form.carbs),
-        unit_label: form.unit_label, unit_g: parseFloat(form.unit_g),
-      }
-    : food
+  // While entering a new food, its macros and unit come from the form, not a
+  // record that doesn't exist yet.
+  const draft = isManual ? foodFromForm(form) : food
 
   const grams = gramsFor({ amount, unit }, draft)
   const preview = macrosFor(draft, grams)
@@ -79,18 +61,9 @@ export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }
       let target = food
       if (isManual) {
         target = await createFood({
+          ...foodFromForm(form),
           barcode: barcode || '',
-          name: form.name.trim(),
-          brand: form.brand.trim(),
           source: 'manual',
-          // Blank stays null rather than 0, so "unknown" and "genuinely zero"
-          // don't get conflated in later totals.
-          kcal: form.kcal === '' ? null : parseFloat(form.kcal),
-          protein: form.protein === '' ? null : parseFloat(form.protein),
-          fat: form.fat === '' ? null : parseFloat(form.fat),
-          carbs: form.carbs === '' ? null : parseFloat(form.carbs),
-          unit_label: form.unit_label.trim(),
-          unit_g: form.unit_g === '' ? null : parseFloat(form.unit_g),
         })
       }
       await logFood({ date, foodId: target.id, amount: a, unit, food: target, meal })
@@ -120,67 +93,7 @@ export default function FoodEntryModal({ food, barcode, date, onSaved, onClose }
                   : 'Add a food by hand.'}
               </div>
 
-              <div className="form-group form-group--compact">
-                <label className="form-label">Name</label>
-                <input
-                  className="form-input form-input--compact"
-                  value={form.name}
-                  onChange={e => setField('name', e.target.value)}
-                  autoFocus
-                  required
-                />
-              </div>
-
-              <div className="form-group form-group--compact">
-                <label className="form-label">Brand</label>
-                <input
-                  className="form-input form-input--compact"
-                  value={form.brand}
-                  onChange={e => setField('brand', e.target.value)}
-                />
-              </div>
-
-              <div className="food-hint">
-                Optional: a natural unit, so you can log this as “1 scoop” or
-                “135 ml” instead of a weight.
-              </div>
-
-              <div className="form-row-2">
-                <div className="form-group form-group--compact">
-                  <label className="form-label">Unit name</label>
-                  <input
-                    className="form-input form-input--compact"
-                    placeholder="scoop, block, ml"
-                    value={form.unit_label}
-                    onChange={e => setField('unit_label', e.target.value)}
-                  />
-                </div>
-                <div className="form-group form-group--compact">
-                  <label className="form-label">Grams per {unitName}</label>
-                  <input
-                    className="form-input form-input--compact"
-                    type="number" inputMode="decimal" step="any" min="0"
-                    value={form.unit_g}
-                    onChange={e => setField('unit_g', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="food-hint">Per 100 g, from the nutrition panel</div>
-
-              <div className="form-row-2">
-                {MACRO_FIELDS.map(({ key, label }) => (
-                  <div className="form-group form-group--compact" key={key}>
-                    <label className="form-label">{label}</label>
-                    <input
-                      className="form-input form-input--compact"
-                      type="number" inputMode="decimal" step="any" min="0"
-                      value={form[key]}
-                      onChange={e => setField(key, e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
+              <FoodForm form={form} onChange={setForm} autoFocus />
             </>
           ) : (
             <div className="food-hint">

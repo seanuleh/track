@@ -27,6 +27,46 @@ export async function searchFoods(query) {
 }
 
 /**
+ * The Foods manager's list: favourites first, then alphabetical.
+ *
+ * Paginated rather than getFullList — the cache only grows, and the manager is
+ * a browsing surface, so it must not degrade as the library fills up.
+ */
+export async function listFoods({ query = '', page = 1, perPage = 50 } = {}) {
+  const opts = { sort: '-favourite,name' }
+  if (query.trim()) {
+    opts.filter = pb.filter('name ~ {:q} || brand ~ {:q} || barcode ~ {:q}', { q: query })
+  }
+  return pb.collection('foods').getList(page, perPage, opts)
+}
+
+export async function updateFood(id, data) {
+  return pb.collection('foods').update(id, data)
+}
+
+export async function deleteFood(id) {
+  return pb.collection('foods').delete(id)
+}
+
+export async function setFavourite(id, favourite) {
+  return pb.collection('foods').update(id, { favourite })
+}
+
+/**
+ * How many logs reference this food.
+ *
+ * `foods` is deliberately not cascade-delete: deleting a food that history
+ * points at would leave logs rendering as "Unknown food" with no macros, and
+ * silently change past totals. The manager asks before doing that.
+ */
+export async function countLogsForFood(foodId) {
+  const rows = await pb.collection('food_logs').getList(1, 1, {
+    filter: pb.filter('food = {:id}', { id: foodId }),
+  })
+  return rows.totalItems
+}
+
+/**
  * Resolve a scanned barcode to a food record.
  *
  * Write-through cache: local hit wins, otherwise ask Open Food Facts and store
