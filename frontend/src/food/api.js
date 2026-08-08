@@ -113,6 +113,10 @@ export async function ensureFoodFromCatalog(item) {
   })
 }
 
+export async function getFood(id) {
+  return pb.collection('foods').getOne(id)
+}
+
 export async function updateFood(id, data) {
   return pb.collection('foods').update(id, data)
 }
@@ -220,6 +224,10 @@ export async function createRecipe({ name, items, servings }) {
     servings: Number(servings) || 1,
     user: pb.authStore.model.id,
   })
+}
+
+export async function updateRecipe(id, { name, items, servings }) {
+  return pb.collection('recipes').update(id, { name, items, servings: Number(servings) || 1 })
 }
 
 export async function deleteRecipe(id) {

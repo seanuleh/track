@@ -330,6 +330,32 @@ body {
   transform: scale(0.96);
 }
 
+.fab-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.fab-action {
+  position: fixed;
+  right: 28px;
+  border: none;
+  border-radius: 10px;
+  background: white;
+  color: var(--text);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(26, 32, 53, 0.18);
+  z-index: 100;
+}
+
+.fab-action:active {
+  transform: scale(0.96);
+}
+
 /* ── Modal ───────────────────────────────── */
 .modal-overlay {
   position: fixed;
@@ -358,6 +384,13 @@ body {
   padding: 16px 18px 24px;
   width: 100%;
   max-width: 480px;
+  /* Every modal is a bottom sheet pinned to the viewport's bottom edge, so
+     unbounded content (a long search result list, a recipe with many
+     ingredients) pushes its top off-screen with no way to reach it —
+     worst on short viewports like the Fold's cover display. Capping the
+     sheet and scrolling internally keeps the close button reachable. */
+  max-height: 85dvh;
+  overflow-y: auto;
   box-shadow: var(--shadow-md);
   animation: modalFadeIn 0.15s ease-out;
 }
@@ -391,6 +424,12 @@ body {
   margin-bottom: 14px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: -16px;
+  padding-top: 16px;
+  margin-top: -16px;
+  background: var(--surface);
+  z-index: 1;
 }
 
 .modal-header--compact {
@@ -840,12 +879,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
   padding: 14px 18px;
   background: var(--surface);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
+}
+
+.log-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
 }
 
 .log-name {
@@ -859,6 +904,14 @@ body {
   margin-top: 2px;
 }
 
+.log-kcal-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 64px;
+}
+
 .log-kcal {
   font-size: 18px;
   font-weight: 500;
@@ -866,10 +919,153 @@ body {
   white-space: nowrap;
 }
 
+.kcal-suffix {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.log-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.log-macros {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+
+/* Narrow viewports (the Fold's cover display): the name truncates with an
+   ellipsis rather than wrapping or pushing the stats onto their own row —
+   one dense line per card beats a taller card. kJ is the least essential
+   figure here, so it's the one dropped for space. */
+@media (max-width: 480px) {
+  .log-name,
+  .log-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-kj-col {
+    display: none;
+  }
+  .log-macro-col {
+    width: 26px;
+  }
+  .log-kcal-col {
+    width: 52px;
+  }
+  .log-macro-label,
+  .log-macro-value,
+  .log-kcal {
+    font-size: 11px;
+  }
+  .kcal-suffix {
+    display: none;
+  }
+}
+
+.log-macro-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  white-space: nowrap;
+}
+
+.log-macro-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.log-macro-value {
+  font-size: 13px;
+  color: var(--text);
+}
+
 /* ── Meal pills + macro preview ──────────── */
 .meal-pills {
   display: flex;
   gap: 6px;
+}
+
+.food-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 0 0 12px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+}
+
+.food-tabs--top {
+  margin-top: 20px;
+}
+
+.ingredient-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.ingredient-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ingredient-kcal {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ingredient-amount {
+  width: 72px;
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.ingredient-unit {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.food-tab {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: calc(var(--radius-sm) - 2px);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.food-tab.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(26, 32, 53, 0.1);
 }
 
 /* Separates your own foods from Open Food Facts hits in the search list, so

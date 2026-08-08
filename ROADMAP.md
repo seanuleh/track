@@ -206,18 +206,51 @@ weights and were kept.
 Still open here: favourites are stored and sorted but nothing consumes them yet; that's
 §2's default list.
 
-### 5. Recipes
+### 4b. Foods manager — made comprehensive — ✅ **done 2026-08-08**
 
-**Schema and API already exist and work; there is no UI.** See `recipes` in the
-migration, and `createRecipe` / `getRecipes` / `logRecipe` / `deleteRecipe` in
-`food/api.js`. `logRecipe` is written and unused.
+Sean's call, reordering the plan: rather than building §2's picker sheet next, make the
+Foods manager the one place that owns *everything* about a food or recipe — add, scan,
+favourite, build recipes — so the diary can later shrink to just finding and logging.
+
+Shipped:
+
+- **FAB speed-dial** (`FAB.jsx` — plain button when given `onClick`, a stack of labelled
+  mini-buttons when given `actions`): Scan barcode / Search catalog / Add manually.
+- **Scan from the manager**: reuses `Scanner.jsx` and `resolveBarcode`. Unlike the diary's
+  scan (which logs), a manager scan always opens `FoodEditModal` — hit or miss — so it's
+  a review-and-fix step, never a silent write. `FoodEditModal` gained a `barcode` prop for
+  the miss case, carried through to `createFood` so the next scan of that barcode hits
+  the cache.
+- **Catalog search from the manager** (`CatalogSearchModal.jsx`): searches the 75k
+  `food_catalog` mirror, promotes via `ensureFoodFromCatalog` on tap, then opens the edit
+  form on the promoted record — same "find it, then correct/enrich it" shape as scanning.
+- **Foods | Recipes sub-tabs** inside `FoodsView` (a segmented control, not a new
+  top-level nav item — Sean's call).
+- **Recipes UI** (`RecipesView.jsx`, `RecipeBuilderModal.jsx`) — the backend existed since
+  §1 with no screens; see §5, now done as part of this rework.
+- **`FoodPicker.jsx`** — the shared "find a food" search (own foods + catalog) used by the
+  recipe builder. Not the full picker sheet from §2 (no scan, no recents/favourites), but
+  the search half of it, reused rather than rebuilt.
+- **Macro/kJ display** on every food/catalog/recipe row (`MacroLine.jsx`, `KcalCol.jsx`):
+  Pro/Car/Fat + kJ + Kcal, each with its value stacked under its label, aligned into fixed-
+  width columns so they line up down the list. On narrow viewports (≤480px — the Fold
+  cover display) the name/brand truncate with an ellipsis and kJ drops, rather than either
+  wrapping the name or pushing the stats onto their own row — one dense line per card.
+  **This is the piece §10 changes**: right now the number is always per-100g; see below.
+
+### 5. Recipes — list + builder ✅ **done 2026-08-08**, logging from the diary still open
+
+Schema and API existed since §1 with no UI (`recipes` in the migration; `createRecipe` /
+`getRecipes` / `updateRecipe` / `deleteRecipe` / `logRecipe` in `food/api.js`). Shipped as
+part of §4b: `RecipesView.jsx` (list, delete-with-confirm, per-serving macro/kJ/kcal
+display) and `RecipeBuilderModal.jsx` (name, servings, ingredient rows via `FoodPicker`,
+a live per-ingredient kcal preview computed from `gramsFor`/`macrosFor` as you edit the
+amount). `updateRecipe` was added for this — it didn't exist before.
 
 Items are `{ food, amount, unit }` since §1 — so a recipe can hold "1 scoop" of protein
 powder next to "34 g" of oats, and dividing by `servings` works either way. `logRecipe`
-still reads a legacy `grams` key as a fallback.
-
-To build: a recipe list, a builder (picker → item list → servings), and a "log one
-serving" action reachable from the diary.
+still reads a legacy `grams` key as a fallback, and is still written but unused — **still
+missing: a "log one serving" action reachable from the diary.**
 
 **Log flow must be edit-before-log**: tapping a recipe opens its item list pre-filled,
 you swap or add rows, then confirm. This was chosen over two rejected alternatives:
@@ -303,6 +336,28 @@ Two commercial options were considered and rejected for now:
   OFF mirror was expected to make this unnecessary — measure before committing.
 - **USDA FoodData Central** — free and huge, but US portions and fortification differ
   enough to mislead for AU products. Last resort.
+
+### 10. Preferred serving size — replace the /100g default in list views
+
+Raised by Sean straight after §4b shipped the macro/kJ display: those numbers are
+currently always **per 100 g**, which isn't how anyone thinks about a food they actually
+eat — "a scoop of protein" or "a slice of bread", not "100 g of it".
+
+Not the same field as the existing `serving_g` (the pack's *stated* serving, when the
+label declares one) — this is a **preferred** serving, Sean's own choice of how much he
+usually eats, independent of what the packaging says. Needs its own field(s) on `foods`
+(schema change — back up first per `CLAUDE.md`, and remember `unit_g`/`unit_label`
+already cover "natural unit" for scoops/blocks/ml; a preferred serving is a different
+concept from a natural unit and from the pack serving, so don't collapse the three).
+
+Once set, `FoodsView`, `CatalogSearchModal` and `RecipesView` rows (`MacroLine.jsx` /
+`KcalCol.jsx`, done in §4b) should show energy/macros scaled to the preferred serving
+instead of per 100 g, with the suffix changing to reflect that (not hardcoded `/100g`).
+Fall back to per-100g display when no preferred serving is set — most catalog rows won't
+have one until Sean sets it, so the fallback path is the common case, not an edge case.
+
+Sean is planning this one with Opus — check for an updated schema/plan before duplicating
+work here.
 
 ### Already mostly done — check before building
 

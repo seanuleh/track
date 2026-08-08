@@ -12,7 +12,7 @@ import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
  * become a new food instead, so the old days keep the numbers that were true
  * at the time.
  */
-export default function FoodEditModal({ food, onSaved, onClose }) {
+export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
   const isNew = !food
   const [form, setForm] = useState(() => formFromFood(food))
   const [saving, setSaving] = useState(false)
@@ -26,7 +26,7 @@ export default function FoodEditModal({ food, onSaved, onClose }) {
     setError(null)
     try {
       const data = foodFromForm(form)
-      if (isNew) await createFood({ ...data, source: 'manual', barcode: '' })
+      if (isNew) await createFood({ ...data, source: 'manual', barcode: barcode || '' })
       else await updateFood(food.id, data)
       onSaved()
     } catch (err) {
@@ -72,6 +72,9 @@ export default function FoodEditModal({ food, onSaved, onClose }) {
 
           {!isNew && food.barcode && (
             <div className="food-hint">Barcode {food.barcode} · source {food.source || 'manual'}</div>
+          )}
+          {isNew && barcode && (
+            <div className="food-hint">Barcode {barcode} isn't on record yet — add it once and it's saved for good.</div>
           )}
           {!isNew && (
             <div className="food-hint">
