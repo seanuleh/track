@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFood, logFood, updateLog, deleteLog, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
-import { today } from '../dates.js'
+import { today, shiftDate } from '../dates.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -142,7 +142,7 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
                 className="form-input form-input--compact"
                 type="date"
                 value={entryDate}
-                max={today()}
+                max={shiftDate(today(), 7)}
                 onChange={e => e.target.value && setEntryDate(e.target.value)}
                 required
               />

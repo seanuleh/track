@@ -179,7 +179,7 @@ export default function FoodView() {
             type="date"
             className="date-nav-input"
             value={date}
-            max={today()}
+            max={shiftDate(today(), 7)}
             onChange={e => e.target.value && setDate(e.target.value)}
             // Desktop Chrome only opens the native picker on its calendar
             // icon, not anywhere else in the field — unlike mobile, which
@@ -193,7 +193,7 @@ export default function FoodView() {
         </label>
         <button
           onClick={() => setDate(d => shiftDate(d, 1))}
-          disabled={date >= today()}
+          disabled={date >= shiftDate(today(), 7)}
           aria-label="Next day"
         >›</button>
         <button
