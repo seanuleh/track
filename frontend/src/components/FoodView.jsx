@@ -110,21 +110,24 @@ export default function FoodView() {
         <div className="header-inner">
           <div className="header-title-row">
             <div className="header-title">Calories</div>
-            <button
-              type="button"
-              className="header-edit-btn"
-              onClick={() => setEditingTarget(true)}
-              aria-label={target ? 'Edit target' : 'Set target'}
-            >
-              ✎
-            </button>
+            <div className="header-title-row-right">
+              {target && (
+                <span className={`header-remaining${totals.kcal > target.kcal ? ' header-remaining--over' : ''}`}>
+                  {Math.round(Math.abs(target.kcal - totals.kcal))} {totals.kcal > target.kcal ? 'over' : 'left'}
+                </span>
+              )}
+              <button
+                type="button"
+                className="header-edit-btn"
+                onClick={() => setEditingTarget(true)}
+                aria-label={target ? 'Edit target' : 'Set target'}
+              >
+                ✎
+              </button>
+            </div>
           </div>
           {target ? (
             <div className="targets-panel">
-              <div className={`header-weight header-weight--remaining${totals.kcal > target.kcal ? ' header-weight--over' : ''}`}>
-                {Math.round(Math.abs(target.kcal - totals.kcal))}
-                <span>{totals.kcal > target.kcal ? 'kcal over' : 'kcal left'}</span>
-              </div>
               {[
                 { key: 'kcal', label: 'Energy', value: totals.kcal, goal: target.kcal, decimals: 0, unit: 'kcal', color: 'energy' },
                 { key: 'protein', label: 'Protein', value: totals.protein, goal: target.protein, decimals: 1, unit: 'g', color: 'protein' },
