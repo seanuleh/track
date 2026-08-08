@@ -118,13 +118,18 @@ case that breaks.
 
 ### 2. The picker sheet, and fixing the input flow — ✅ **done 2026-08-08**
 
-Shipped as `FoodPickerSheet.jsx`, opened by a `+` on each meal header (`FoodView.jsx`).
-Meal headers now always render, even empty, so the `+` stays reachable. The sheet shows
+Shipped as `FoodPickerSheet.jsx`. First cut opened it from a `+` on each meal header with
+the meal preset; **Sean's call, changed same day**: a single FAB (`FAB.jsx`) opens the
+sheet instead, meal is chosen inside `FoodEntryModal` same as before (defaulting from the
+clock), and misassigned entries are fixed by **dragging a logged entry onto another meal
+section** — native HTML5 drag/drop, `updateLogMeal` in `food/api.js`. `FoodEntryModal`
+still supports a locked preset meal (`meal` prop) for anything that wants to skip the
+pill step; the diary itself no longer uses it. Meal sections still always render, even
+empty, so they're valid drop targets before anything's logged into them. The sheet shows
 recents (`getRecentFoods`, read from `food_logs` — the log itself is the freshness
 signal) and favourites before typing, your own foods then the catalog after typing, a
-scan button, and "create custom food". Picking anything hands off to `FoodEntryModal`
-with `meal` locked, which now skips its own meal-pill step when a meal is preset. The
-old top-of-day Scan/Add-manually/search trio is gone.
+scan button, and "create custom food". The old top-of-day Scan/Add-manually/search trio
+is gone either way.
 
 Not done as part of this: the quantity field isn't inline in the sheet itself — picking
 a result still opens `FoodEntryModal` as a second step for amount/unit. Full single-sheet
