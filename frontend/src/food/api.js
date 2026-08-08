@@ -350,16 +350,14 @@ export async function deleteRecipe(id) {
 }
 
 /**
- * Log one serving of a recipe by expanding it into individual food_logs rows.
- * Expanding at log time (rather than storing a reference) means editing a
- * recipe later never rewrites history that was already logged.
- *
- * Items carry their own unit — a recipe can hold "1 scoop" of protein powder
- * alongside "34 g" of oats. Dividing by servings works either way.
+ * Log a finished list of {food, amount, unit} rows as one recipe serving,
+ * expanding into individual food_logs rows sharing a recipe_group. This is
+ * the write path for both "log as-is" (logRecipe, below) and edit-before-log
+ * (RecipeLogModal, which lets items be swapped/adjusted first) — expanding
+ * at log time rather than storing a reference means neither path lets a
+ * later recipe edit rewrite history that was already logged.
  */
-export async function logRecipe(recipe, { date, meal }) {
-  const servings = Number(recipe.servings) || 1
-  const items = Array.isArray(recipe.items) ? recipe.items : []
+export async function logRecipeItems(items, { date, meal, recipeName }) {
   // Shared by every row from this call, so the diary can collapse them back
   // into one card — crypto.randomUUID() needs no server round trip.
   const recipeGroup = crypto.randomUUID()
@@ -369,13 +367,31 @@ export async function logRecipe(recipe, { date, meal }) {
       logFood({
         date,
         foodId: item.food,
-        amount: Number(item.amount ?? item.grams) / servings,
+        amount: Number(item.amount ?? item.grams),
         unit: item.unit || 'g',
         meal,
         recipeGroup,
-        recipeName: recipe.name,
+        recipeName,
       })
     )
+  )
+}
+
+/**
+ * Log one serving of a recipe as saved, no edits. Items carry their own
+ * unit — a recipe can hold "1 scoop" of protein powder alongside "34 g" of
+ * oats — so dividing by servings works either way.
+ */
+export async function logRecipe(recipe, { date, meal }) {
+  const servings = Number(recipe.servings) || 1
+  const items = Array.isArray(recipe.items) ? recipe.items : []
+  return logRecipeItems(
+    items.map(item => ({
+      food: item.food,
+      amount: Number(item.amount ?? item.grams) / servings,
+      unit: item.unit || 'g',
+    })),
+    { date, meal, recipeName: recipe.name }
   )
 }
 

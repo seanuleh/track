@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
   searchFoods, searchCatalog, getRecentFoods, getFavouriteFoods, resolveBarcode,
-  getRecipes, logRecipe, getFood, gramsFor, macrosFor,
+  getRecipes, getFood, gramsFor, macrosFor,
 } from '../food/api.js'
 import Scanner from './Scanner.jsx'
-import FoodEntryModal, { defaultMeal } from './FoodEntryModal.jsx'
+import FoodEntryModal from './FoodEntryModal.jsx'
+import RecipeLogModal from './RecipeLogModal.jsx'
 
 // Per-serving kcal for a recipe — same math as RecipesView, duplicated rather
 // than imported because it's a private helper there, not part of the API surface.
@@ -44,7 +45,7 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
   const [scanning, setScanning] = useState(false)
   const [status, setStatus] = useState(null)
   const [entry, setEntry] = useState(null) // { food, catalog, barcode } for FoodEntryModal
-  const [logging, setLogging] = useState(null) // recipe.id currently being logged
+  const [loggingRecipe, setLoggingRecipe] = useState(null) // recipe opened for edit-before-log
 
   useEffect(() => {
     getRecentFoods(8).then(setRecents).catch(() => {})
@@ -56,17 +57,6 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
       setRecipeKcals(Object.fromEntries(entries))
     }).catch(() => {})
   }, [])
-
-  async function handleLogRecipe(recipe) {
-    setLogging(recipe.id)
-    try {
-      await logRecipe(recipe, { date, meal: meal || defaultMeal() })
-      onLogged()
-    } catch (err) {
-      setStatus('Failed to log recipe — ' + err.message)
-      setLogging(null)
-    }
-  }
 
   useEffect(() => {
     if (!query.trim()) { setMine([]); setCatalog([]); return }
@@ -114,6 +104,18 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
     )
   }
 
+  if (loggingRecipe) {
+    return (
+      <RecipeLogModal
+        recipe={loggingRecipe}
+        date={date}
+        meal={meal}
+        onLogged={onLogged}
+        onClose={() => setLoggingRecipe(null)}
+      />
+    )
+  }
+
   // Favourites not already surfaced by recents, so the same food isn't listed twice.
   const recentIds = new Set(recents.map(f => f.id))
   const favouritesOnly = favourites.filter(f => !recentIds.has(f.id))
@@ -131,12 +133,11 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
         key={r.id}
         type="button"
         className="search-result"
-        disabled={logging === r.id}
-        onClick={() => handleLogRecipe(r)}
+        onClick={() => setLoggingRecipe(r)}
       >
         <span className="sr-name">{r.name}</span>
         <span className="sr-meta">
-          {logging === r.id ? 'Logging…' : (kcal != null ? `${Math.round(kcal)} kcal/serving` : '—')}
+          {kcal != null ? `${Math.round(kcal)} kcal/serving` : '—'}
         </span>
       </button>
     )
