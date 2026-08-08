@@ -326,6 +326,36 @@ export async function updateLogGroupMeal(recipeGroup, meal) {
   return Promise.all(rows.map(r => pb.collection('food_logs').update(r.id, { meal })))
 }
 
+/**
+ * Copy a set of logged rows (a meal, or a whole day) onto `targetDate` as
+ * fresh food_logs rows — the diary's "copy to another day". Recipe rows keep
+ * their grouping so a copied recipe still collapses into one card, but under
+ * a new recipe_group per distinct source group, not the original one: reusing
+ * the old id would merge the copy's rows into the source day's group in any
+ * query that doesn't also filter by date.
+ */
+export async function copyLogs(logs, targetDate) {
+  const groupMap = new Map() // source recipe_group -> new recipe_group
+  return Promise.all(logs.map(log => {
+    let recipeGroup = ''
+    if (log.recipe_group) {
+      if (!groupMap.has(log.recipe_group)) groupMap.set(log.recipe_group, crypto.randomUUID())
+      recipeGroup = groupMap.get(log.recipe_group)
+    }
+    return pb.collection('food_logs').create({
+      date: targetDate,
+      food: log.food,
+      amount: log.amount,
+      unit: log.unit,
+      grams: log.grams,
+      meal: log.meal,
+      recipe_group: recipeGroup,
+      recipe_name: log.recipe_name || '',
+      user: pb.authStore.model.id,
+    })
+  }))
+}
+
 // ── recipes ──────────────────────────────────────────────────────────────
 
 export async function getRecipes() {

@@ -329,12 +329,19 @@ progress against them yet.
 
 Not done: deriving a suggested target from the weight trend.
 
-### 8. Copy meals/foods to another day
+### 8. Copy meals/foods to another day — ✅ **done 2026-08-08**
 
-Cheapest useful version: "copy this meal to today", creating fresh `food_logs` rows
-with a new `date`. Everything needed is already in the schema.
+Shipped as `copyLogs` (`food/api.js`) + `CopyDateModal.jsx`: a small `⧉` button on
+each meal section header ("Copy breakfast") and one on the date-nav row ("Copy day"),
+both opening the same modal to pick a target date. Copies are fresh `food_logs` rows —
+the source day is untouched, not moved.
 
-Follow-ons: duplicate a single entry, copy a whole day.
+Recipe rows keep their grouping (still collapse into one card in the diary) but get a
+new `recipe_group` per distinct source group, not the original id — reusing the old one
+would merge the copy's rows into the source day's group in any query that doesn't also
+filter by date.
+
+Not done (no request for it yet): duplicating a single entry.
 
 ### 9. AFCD whole foods — **low priority**
 

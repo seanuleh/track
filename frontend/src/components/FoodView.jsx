@@ -4,6 +4,7 @@ import FoodPickerSheet from './FoodPickerSheet.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
 import RecipeGroupModal from './RecipeGroupModal.jsx'
 import TargetsModal from './TargetsModal.jsx'
+import CopyDateModal from './CopyDateModal.jsx'
 import FAB from './FAB.jsx'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
@@ -22,6 +23,7 @@ export default function FoodView() {
   const [editingLog, setEditingLog] = useState(null) // a single log tapped for edit/delete
   const [editingGroup, setEditingGroup] = useState(null) // a recipe card tapped for edit/delete
   const [editingTarget, setEditingTarget] = useState(false)
+  const [copying, setCopying] = useState(null) // { logs, label } for CopyDateModal
   const [dragId, setDragId] = useState(null)
   const [dragOverMeal, setDragOverMeal] = useState(null)
 
@@ -194,6 +196,12 @@ export default function FoodView() {
           disabled={date >= today()}
           aria-label="Next day"
         >›</button>
+        <button
+          className="date-nav-copy"
+          onClick={() => setCopying({ logs, label: 'Copy day' })}
+          disabled={logs.length === 0}
+          aria-label="Copy this day to another date"
+        >⧉</button>
       </div>
 
       {error && <div className="error">{error}</div>}
@@ -206,7 +214,17 @@ export default function FoodView() {
           onDragLeave={() => setDragOverMeal(m => (m === meal ? null : m))}
           onDrop={(e) => { e.preventDefault(); handleDrop(meal) }}
         >
-          <div className="section-title">{meal}</div>
+          <div className="section-title-row">
+            <div className="section-title">{meal}</div>
+            {items.length > 0 && (
+              <button
+                type="button"
+                className="section-copy-btn"
+                onClick={() => setCopying({ logs: logs.filter(l => (l.meal || 'snack') === meal), label: `Copy ${meal}` })}
+                aria-label={`Copy ${meal} to another date`}
+              >⧉</button>
+            )}
+          </div>
           {items.length > 0 ? (
             <div className="log-list">
               {items.map(entry => {
@@ -312,6 +330,15 @@ export default function FoodView() {
           current={target}
           onClose={() => setEditingTarget(false)}
           onSaved={() => { setEditingTarget(false); load() }}
+        />
+      )}
+
+      {copying && (
+        <CopyDateModal
+          logs={copying.logs}
+          label={copying.label}
+          onClose={() => setCopying(null)}
+          onCopied={() => { setCopying(null); load() }}
         />
       )}
     </>

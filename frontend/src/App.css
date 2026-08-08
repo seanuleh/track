@@ -302,6 +302,40 @@ body {
   padding: 8px 0 14px;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-copy-btn {
+  font-size: 14px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 0 0 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.section-copy-btn:hover {
+  color: var(--accent);
+}
+
+.date-nav-copy {
+  font-size: 15px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.date-nav-copy:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .meal-section {
   border-radius: var(--radius-sm);
   transition: background 0.15s, box-shadow 0.15s;
