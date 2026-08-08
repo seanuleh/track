@@ -155,9 +155,8 @@ than the last sync or sold outside AU/NZ.
 Scope is AU + NZ (Sean's call): 62,896 AU, 10,591 NZ, 2,040 both. UK/US were rejected as
 noise — they'd have added 1.1M rows of products you can't buy.
 
-Still worth doing: **AFCD**, per the recommendation below. OFF is a barcode database, so
-it covers whole foods (chicken breast, rolled oats, a banana) badly — exactly the gap
-§5's recipe builder will hit.
+The remaining gap — whole foods, which OFF covers badly — is **§9 (AFCD)**, deliberately
+parked at low priority.
 
 ### 3b. Remote food search — the original analysis
 
@@ -175,20 +174,8 @@ by scanning.
 > build interactive search on OFF `/search`.** If you use it at all, treat a non-JSON
 > body as a throttle signal, not a parse bug. `off.js` already guards this way.
 
-Recommended instead, in order:
-
-1. **AFCD (Australian Food Composition Database, FSANZ)** — the authoritative AU source
-   for whole foods. ~1,600 items, free XLSX download, government data, static. No API,
-   so a one-off import into `foods` with `source: 'afcd'`. Bounded, offline,
-   one-afternoon job. **Start here.**
-2. **FatSecret Platform API** — best AU *branded* coverage of the commercial options
-   (Woolworths/Coles house brands), free tier, OAuth + attribution required. Worth it
-   only if AFCD + scanning still leaves real gaps. Measure before committing.
-3. **USDA FoodData Central** — free, huge, but US portions and fortification differ
-   enough to be misleading for AU products. Last resort.
-
-A server-side key (FatSecret) breaks the current no-worker architecture — you'd need a
-worker sidecar, and the `fridge` app is the pattern to copy.
+That warning still holds and is why the mirror exists. The alternative sources this
+section used to recommend (AFCD, FatSecret, USDA) have moved to **§9**.
 
 ### 4. Foods tab — the manager — ✅ **done 2026-08-08**
 
@@ -281,6 +268,41 @@ Cheapest useful version: "copy this meal to today", creating fresh `food_logs` r
 with a new `date`. Everything needed is already in the schema.
 
 Follow-ons: duplicate a single entry, copy a whole day.
+
+### 9. AFCD whole foods — **low priority**
+
+The one real gap the OFF mirror leaves. OFF is a *barcode* database, so it is thin on
+things sold without a pack: chicken breast, rolled oats, a banana, plain rice. Those are
+exactly the ingredients a recipe (§5) is built from, so if the builder feels short of
+ingredients, this is why.
+
+**AFCD** (Australian Food Composition Database, FSANZ) is the authoritative AU source:
+~1,600 items, free XLSX download, government data, static — no API and no rate limits.
+A one-off import, not a sync: it changes on the order of years, so there is no timer to
+build and no delta mechanism to maintain.
+
+Import into `food_catalog` with `source: 'afcd'` — the same collection the OFF mirror
+uses, since it is the same kind of thing (a browsable reference you copy into `foods` on
+first log) and that keeps one search path rather than two. Note `food_catalog` has no
+`source` column yet; add one in the same migration so AFCD and OFF rows stay tellable
+apart in the UI and on re-import. `barcode` is empty for these, and the unique index on
+it will reject the second such row — that index needs relaxing (partial index on
+non-empty barcodes) or AFCD rows need a synthetic key. **Check this before starting; it
+is the one thing that will bite.**
+
+Deliberately low priority: whole foods are a small share of what actually gets logged
+here, manual entry already covers them in one tap, and the macros for chicken breast are
+stable enough that entering it once is a permanent fix. Revisit when §5 makes the gap
+concrete.
+
+Two commercial options were considered and rejected for now:
+
+- **FatSecret Platform API** — best AU *branded* coverage (Woolworths/Coles house
+  brands), free tier, OAuth + attribution. A server-side key breaks the no-worker
+  architecture; you'd need a worker sidecar, with `fridge` as the pattern to copy. The
+  OFF mirror was expected to make this unnecessary — measure before committing.
+- **USDA FoodData Central** — free and huge, but US portions and fortification differ
+  enough to mislead for AU products. Last resort.
 
 ### Already mostly done — check before building
 

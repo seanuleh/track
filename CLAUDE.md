@@ -214,6 +214,10 @@ food_catalog (upsert, newest-wins)              [nightly, ~6 s]
 - **The deltas only cover 14 days.** If the timer is broken longer than that, reseed
   from the parquet — the mirror can't catch up on its own.
 - DuckDB CLI lives at `/home/sean/bin/duckdb` (not a package).
+- **The parquet is not kept** — it was deleted after the first import (7.75 GB for a file
+  only a reseed needs). `full` re-downloads it automatically. `/data/off/catalog.csv` is
+  the extracted 75k rows and survives, so a reseed that doesn't need fresher data can
+  skip the download.
 
 Two shapes, which is why `full` and `delta` are separate code paths and not one:
 the parquet has `nutriments` as a `STRUCT(name, "100g", …)[]` list and `product_name` as
