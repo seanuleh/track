@@ -134,6 +134,8 @@ multiply. Filled on demand from Open Food Facts barcode lookups, plus manual ent
 | unit_label | text | name of one natural unit — `scoop`, `block`, `ml`, `wrap` |
 | unit_g | number | grams in one such unit (milk: `1.03` per ml). Empty = no gram equivalent |
 | favourite | bool | pinned to the top of the Foods manager; will seed the picker's default list |
+| portion_amount | number | **your** usual portion; empty = never set, fall back |
+| portion_unit | text | `g` \| `unit` — the basis `portion_amount` is counted in |
 | kcal, protein, fat, carbs, fiber, sugar | number | per 100 g |
 | sodium | number | mg per 100 g |
 | raw | json | untouched upstream payload, for later backfill |
@@ -151,6 +153,26 @@ refresh can't rewrite macros behind days already logged.
 
 Same reason `resolveBarcode` is now three tiers: `foods` → `food_catalog` → OFF network.
 Most scans never touch the network.
+
+### Unit vs pack serving vs portion
+
+Three separate ideas that are easy to conflate:
+
+- **Unit** (`unit_label` + `unit_g`) is a *conversion*, not a quantity: "1 scoop = 30 g".
+- **`serving_g`** is what the pack claims. Reference only — pack servings are routinely
+  absurd in both directions, so they must never be the logging default.
+- **`portion_amount` + `portion_unit`** is *your* usual amount. This is what the Foods
+  manager reports macros for and what the diary prefills.
+
+Portion is stored as an `{amount, unit}` pair — the same shape as a log — deliberately,
+**not** as a single gram figure. "1.5 scoops" has to stay expressed in scoops so that
+fixing `unit_g` later corrects the portion too, the same rule `gramsFor` enforces for
+logs. Stored as 45 g it would silently go stale.
+
+`portionOf(food)` resolves the default and **falls back** rather than requiring curation:
+stored portion → 1 unit (if `unit_g` set) → `serving_g` → 100 g. `serving_g` ranks last
+of the real options because it's the manufacturer's number. Nothing is backfilled into
+`portion_amount`; empty means "never set", which the Foods list dims (`.portion-unset`).
 
 **`food_logs`** (base collection) — one row per thing eaten: `date` (YYYY-MM-DD),
 `food` (relation → foods), `amount`, `unit`, `meal`, `user`. Indexed on `(user, date)`.

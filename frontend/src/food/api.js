@@ -279,6 +279,29 @@ export function gramsFor(log, food) {
   return unitG > 0 ? amount * unitG : null
 }
 
+/**
+ * The default amount for this food, as a {amount, unit} pair — the same shape
+ * as a log, so it drops straight into gramsFor, formatAmount and logFood.
+ *
+ * A stored portion wins. Otherwise this falls back rather than forcing every
+ * food to be curated before it can be logged: one natural unit if it has one,
+ * then the pack's declared serving, then 100 g. The pack serving ranks last of
+ * the real options because it's the manufacturer's number, not yours.
+ */
+export function portionOf(food) {
+  if (Number(food?.portion_amount) > 0) {
+    return { amount: Number(food.portion_amount), unit: food.portion_unit === 'unit' ? 'unit' : 'g' }
+  }
+  if (food?.unit_label && Number(food?.unit_g) > 0) return { amount: 1, unit: 'unit' }
+  if (Number(food?.serving_g) > 0) return { amount: Number(food.serving_g), unit: 'g' }
+  return { amount: 100, unit: 'g' }
+}
+
+/** Whether the portion is yours or just the fallback — drives the "set one" nudge. */
+export function hasOwnPortion(food) {
+  return Number(food?.portion_amount) > 0
+}
+
 /** How the amount reads back to a human: "34 g", "1 scoop", "135 ml". */
 export function formatAmount(log, food) {
   const amount = Number(log?.amount ?? log?.grams) || 0

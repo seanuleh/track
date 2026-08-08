@@ -26,6 +26,13 @@ export function foodFromForm(form) {
     unit_label: form.unit_label.trim(),
     unit_g: numOrNull(form.unit_g),
     serving_g: numOrNull(form.serving_g),
+    portion_amount: numOrNull(form.portion_amount),
+    // Only meaningful alongside an amount, and only honest if the food really
+    // has a unit — otherwise it silently becomes grams at read time anyway.
+    portion_unit:
+      form.portion_amount !== '' && form.portion_unit === 'unit' && form.unit_label.trim()
+        ? 'unit'
+        : 'g',
     kcal: numOrNull(form.kcal),
     protein: numOrNull(form.protein),
     fat: numOrNull(form.fat),
@@ -45,6 +52,8 @@ export function formFromFood(food) {
     unit_label: food?.unit_label || '',
     unit_g: str(food?.unit_g || ''),
     serving_g: str(food?.serving_g || ''),
+    portion_amount: str(food?.portion_amount || ''),
+    portion_unit: food?.portion_unit === 'unit' ? 'unit' : 'g',
     kcal: str(food?.kcal), protein: str(food?.protein),
     fat: str(food?.fat), carbs: str(food?.carbs),
     fiber: str(food?.fiber), sugar: str(food?.sugar),
@@ -68,6 +77,7 @@ const EXTRA_FIELDS = [
 export default function FoodForm({ form, onChange, autoFocus = false, showExtras = false }) {
   const set = (key, value) => onChange({ ...form, [key]: value })
   const unitName = form.unit_label.trim() || 'unit'
+  const canUsePortionUnit = !!form.unit_label.trim() && parseFloat(form.unit_g) > 0
 
   return (
     <>
@@ -114,6 +124,44 @@ export default function FoodForm({ form, onChange, autoFocus = false, showExtras
             value={form.unit_g}
             onChange={e => set('unit_g', e.target.value)}
           />
+        </div>
+      </div>
+
+      <div className="food-hint">
+        Your usual portion — what the Foods list reports macros for, and what the
+        diary prefills. Not the pack serving
+        {form.serving_g ? `, which claims ${form.serving_g} g` : ''}.
+      </div>
+
+      <div className="form-row-2">
+        <div className="form-group form-group--compact">
+          <label className="form-label">My portion</label>
+          <input
+            className="form-input form-input--compact"
+            type="number" inputMode="decimal" step="any" min="0"
+            placeholder={canUsePortionUnit ? '1' : '100'}
+            value={form.portion_amount}
+            onChange={e => set('portion_amount', e.target.value)}
+          />
+        </div>
+        <div className="form-group form-group--compact">
+          <label className="form-label">Measured in</label>
+          {/* The unit option only appears once the food defines a unit with a
+              gram equivalent — a portion in scoops is meaningless without it. */}
+          <div className="unit-toggle">
+            <button
+              type="button"
+              className={`meal-pill${form.portion_unit !== 'unit' ? ' active' : ''}`}
+              onClick={() => set('portion_unit', 'g')}
+            >g</button>
+            {canUsePortionUnit && (
+              <button
+                type="button"
+                className={`meal-pill${form.portion_unit === 'unit' ? ' active' : ''}`}
+                onClick={() => set('portion_unit', 'unit')}
+              >{unitName}</button>
+            )}
+          </div>
         </div>
       </div>
 

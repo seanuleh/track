@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFood, logFood, macrosFor, gramsFor, ensureFoodFromCatalog } from '../food/api.js'
+import { createFood, logFood, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -29,13 +29,12 @@ export default function FoodEntryModal({ food, catalog, barcode, date, onSaved, 
   food = food || catalog || null
   const isManual = !food
 
-  // A food that defines a unit (scoop, block, ml) defaults to one of them;
-  // everything else defaults to grams, prefilled with the pack's serving.
+  // Prefilled with your portion for this food — the amount you actually eat —
+  // falling back to a unit, the pack serving, then 100 g. Always overridable.
   const hasUnit = !!food?.unit_label
-  const [unit, setUnit] = useState(hasUnit ? 'unit' : 'g')
-  const [amount, setAmount] = useState(() =>
-    hasUnit ? '1' : String(food?.serving_g || 100)
-  )
+  const initial = portionOf(food)
+  const [unit, setUnit] = useState(initial.unit)
+  const [amount, setAmount] = useState(() => String(initial.amount))
   const [meal, setMeal] = useState(defaultMeal)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)

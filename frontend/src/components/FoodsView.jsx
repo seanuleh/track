@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { listFoods, setFavourite, resolveBarcode } from '../food/api.js'
+import { listFoods, setFavourite, resolveBarcode, portionOf, hasOwnPortion, gramsFor, formatAmount } from '../food/api.js'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
 import FoodEditModal from './FoodEditModal.jsx'
@@ -124,7 +124,12 @@ export default function FoodsView() {
           {loading && <div className="loading">Loading…</div>}
 
           <div className="log-list">
-            {foods.map(food => (
+            {foods.map(food => {
+              // Macros are reported for the portion, not per 100 g — the number
+              // that matters is what you'd actually eat.
+              const portion = portionOf(food)
+              const portionGrams = gramsFor(portion, food)
+              return (
               <div key={food.id} className="log-card" onClick={() => setEditing({ food })}>
                 <button
                   className={`fav-star${food.favourite ? ' active' : ''}`}
@@ -137,18 +142,30 @@ export default function FoodsView() {
                   <div className="log-name">{food.name}</div>
                   <div className="log-meta">
                     {food.brand ? `${food.brand} · ` : ''}
-                    {food.unit_label
-                      ? `per ${food.unit_label}${food.unit_g ? ` (${food.unit_g} g)` : ''} · `
-                      : ''}
-                    {food.source || 'manual'}
+                    <span className={hasOwnPortion(food) ? '' : 'portion-unset'}>
+                      {formatAmount(portion, food)}
+                      {/* The gram equivalent of a unit portion, since that's
+                          what the macros beside it are actually computed on. */}
+                      {portion.unit === 'unit' && portionGrams != null
+                        ? ` (${Math.round(portionGrams)} g)`
+                        : ''}
+                      {hasOwnPortion(food) ? '' : ' (default)'}
+                    </span>
+                    {` · ${food.source || 'manual'}`}
                   </div>
                 </div>
                 <div className="log-stats">
-                  <MacroLine food={food} />
-                  <KcalCol kcal={food.kcal} />
+                  <MacroLine food={food} grams={portionGrams} />
+                  <KcalCol
+                    kcal={food.kcal == null || portionGrams == null
+                      ? null
+                      : food.kcal * portionGrams / 100}
+                    suffix="/portion"
+                  />
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {!loading && foods.length === 0 && (

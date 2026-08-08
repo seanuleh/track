@@ -904,6 +904,13 @@ body {
   margin-top: 2px;
 }
 
+/* A fallback portion, not one you've set — dimmed so the list shows at a
+   glance which foods still need a real portion. */
+.portion-unset {
+  opacity: 0.6;
+  font-style: italic;
+}
+
 .log-kcal-col {
   display: flex;
   flex-direction: column;
