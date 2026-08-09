@@ -18,6 +18,22 @@
   --shadow-md: 0 4px 16px rgba(26, 32, 53, 0.1), 0 0 0 1px rgba(26, 32, 53, 0.04);
   --font-display: 'Cormorant Garamond', Georgia, serif;
   --font-body: 'Jost', system-ui, sans-serif;
+
+  /* One motion vocabulary, so nothing in the app moves at a speed or curve
+     that nothing else uses. --ease-out front-loads the movement and settles
+     softly: it reads as immediate rather than as something easing in. The
+     durations are deliberately short — anything over ~250ms on a phone stops
+     feeling like a response to the tap and starts feeling like a wait.
+
+     Every transition names the properties it animates. `transition: all` was
+     used throughout and is a trap: it animates whatever happens to change,
+     including layout properties, so a re-render can silently start animating
+     width or padding a frame at a time. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --t-fast: 110ms;
+  --t-base: 170ms;
+  --t-slow: 260ms;
 }
 
 * {
@@ -46,7 +62,10 @@ body {
 #root {
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 20px 120px;
+  /* The trailing space clears the FAB and the tab bar. env() adds the phone's
+     gesture bar on top of that when the app runs installed (standalone), where
+     there's no browser chrome to absorb it. */
+  padding: 0 20px calc(120px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ── Header ──────────────────────────────── */
@@ -162,7 +181,7 @@ body {
 .target-metric-fill {
   height: 100%;
   border-radius: 999px;
-  transition: width 0.2s ease;
+  transition: width var(--t-slow) var(--ease-out);
 }
 
 .target-metric-fill--energy { background: #e8834f; }
@@ -252,7 +271,7 @@ body {
   bottom: 6px;
   border-radius: 10px;
   background: var(--accent);
-  transition: left 0.22s cubic-bezier(0.4, 0, 0.2, 1), width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: left var(--t-base) var(--ease-out), width var(--t-base) var(--ease-out);
   pointer-events: none;
   z-index: 0;
 }
@@ -271,12 +290,19 @@ body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: color var(--t-fast) var(--ease-out);
   border-radius: 10px;
 }
 
-.pill:hover {
-  color: var(--text);
+/* Every :hover in this file is gated on a real pointer. A touch tap leaves the
+   hover state latched on the element it landed on until something else is
+   tapped, so an un-gated hover shows up as a row that stays highlighted long
+   after you've let go — the single biggest source of "why is that still lit
+   up?" on the phone. */
+@media (hover: hover) {
+  .pill:hover {
+    color: var(--text);
+  }
 }
 
 .pill.active {
@@ -318,8 +344,10 @@ body {
   line-height: 1;
 }
 
-.section-copy-btn:hover {
-  color: var(--accent);
+@media (hover: hover) {
+  .section-copy-btn:hover {
+    color: var(--accent);
+  }
 }
 
 .date-nav-copy {
@@ -344,7 +372,7 @@ body {
   border-radius: var(--radius-sm);
   padding: 8px;
   margin: -8px;
-  transition: background 0.15s, box-shadow 0.15s;
+  transition: background var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
 }
 
 .meal-section--dragover {
@@ -378,11 +406,13 @@ body {
   align-items: center;
   gap: 16px;
   padding: 14px 18px;
-  transition: box-shadow 0.15s;
+  transition: box-shadow var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
 }
 
-.entry-card:hover {
-  box-shadow: var(--shadow-md);
+@media (hover: hover) {
+  .entry-card:hover {
+    box-shadow: var(--shadow-md);
+  }
 }
 
 .entry-weight {
@@ -427,12 +457,14 @@ body {
   display: flex;
   gap: 2px;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity var(--t-base) var(--ease-out);
 }
 
 /* Desktop: show on hover */
-.entry-card:hover .entry-actions {
-  opacity: 1;
+@media (hover: hover) {
+  .entry-card:hover .entry-actions {
+    opacity: 1;
+  }
 }
 
 /* Mobile: show when row is tapped (class toggled via JS) */
@@ -448,17 +480,19 @@ body {
   border-radius: 7px;
   color: var(--text-faint);
   line-height: 0;
-  transition: all 0.15s;
+  transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
 }
 
-.icon-btn:hover {
-  background: var(--surface2);
-  color: var(--text-muted);
-}
+@media (hover: hover) {
+  .icon-btn:hover {
+    background: var(--surface2);
+    color: var(--text-muted);
+  }
 
-.icon-btn.danger:hover {
-  background: rgba(201, 42, 42, 0.07);
-  color: var(--danger);
+  .icon-btn.danger:hover {
+    background: rgba(201, 42, 42, 0.07);
+    color: var(--danger);
+  }
 }
 
 /* ── FAB ─────────────────────────────────── */
@@ -478,15 +512,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform var(--t-base) var(--ease-spring),
+              box-shadow var(--t-base) var(--ease-out),
+              background var(--t-fast) var(--ease-out);
   z-index: 100;
   box-shadow: 0 4px 20px rgba(59, 91, 219, 0.35);
 }
 
-.fab:hover {
-  background: var(--accent-dim);
-  box-shadow: 0 6px 28px rgba(59, 91, 219, 0.45);
-  transform: scale(1.08) translateY(-2px);
+@media (hover: hover) {
+  .fab:hover {
+    background: var(--accent-dim);
+    box-shadow: 0 6px 28px rgba(59, 91, 219, 0.45);
+    transform: scale(1.08) translateY(-2px);
+  }
 }
 
 .fab:active {
@@ -513,6 +551,15 @@ body {
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(26, 32, 53, 0.18);
   z-index: 100;
+  /* Staggered per-item via an inline animation-delay, so the dial unrolls from
+     the button rather than all three appearing at once. `backwards` keeps each
+     one hidden through its delay instead of flashing in at full size first. */
+  animation: fabActionIn var(--t-base) var(--ease-spring) backwards;
+}
+
+@keyframes fabActionIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
 }
 
 .fab-action:active {
@@ -532,6 +579,14 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  /* The backdrop used to appear in one frame while the sheet under it faded,
+     which read as a flash rather than a transition. */
+  animation: overlayFadeIn var(--t-base) var(--ease-out);
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @media (min-width: 600px) {
@@ -543,8 +598,12 @@ body {
 .modal {
   background: var(--surface);
   border-radius: var(--radius) var(--radius) 0 0;
-  border-top: 1px solid var(--border);
-  padding: 16px 18px 24px;
+  /* No top border: on a white sheet over a blurred backdrop it read as a
+     stray pale line across the top of every modal rather than an edge. The
+     rounded corners and the shadow already separate the sheet from the page.
+     Top padding lives on .modal-header instead, so the header can stick to
+     the very top of the scrollport with nothing showing above it. */
+  padding: 0 18px calc(24px + env(safe-area-inset-bottom, 0px));
   width: 100%;
   max-width: 480px;
   /* Every modal is a bottom sheet pinned to the viewport's bottom edge, so
@@ -554,16 +613,23 @@ body {
      sheet and scrolling internally keeps the close button reachable. */
   max-height: 85dvh;
   overflow-y: auto;
+  /* Reaching the end of a long ingredient or search list must not hand the
+     rest of the gesture to the page underneath — the sheet would appear to
+     stick while the diary scrolled behind it. */
+  overscroll-behavior: contain;
   box-shadow: var(--shadow-md);
-  animation: modalFadeIn 0.15s ease-out;
+  /* Opacity only, no translateY: the sheet is repositioned by the browser as
+     the keyboard opens, and a transform running at the same time fights it.
+     See the keyboard notes in CLAUDE.md. */
+  animation: modalFadeIn var(--t-base) var(--ease-out);
 }
 
 @media (min-width: 600px) {
   .modal {
     border-radius: var(--radius);
     border: 1px solid var(--border);
-    padding: 24px;
-    animation: fadeScale 0.2s ease-out;
+    padding: 0 24px 24px;
+    animation: fadeScale var(--t-base) var(--ease-out);
   }
   .modal-overlay {
     padding-bottom: 0 !important;
@@ -576,23 +642,52 @@ body {
 }
 
 @keyframes fadeScale {
-  from { transform: scale(0.96); opacity: 0; }
+  from { transform: scale(0.97); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 
+/* Full-bleed across the sheet, not just the content column. The header used
+   to sit inside the modal's 18px horizontal padding, so its opaque background
+   covered only the middle: scrolled rows stayed visible in the 18px gutters
+   either side of it and reappeared above its bottom border — the pale band
+   and stray line that looked like a border drawn over the modal. Negative
+   side margins matched by equal padding push the background out to the
+   sheet's edges, where `overflow: hidden` on the rounded modal clips it. */
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-light);
   position: sticky;
-  top: -16px;
-  padding-top: 16px;
-  margin-top: -16px;
+  top: 0;
+  z-index: 2;
+  margin: 0 -18px 14px;
+  padding: 22px 18px 12px;
+  border-bottom: 1px solid var(--border-light);
   background: var(--surface);
-  z-index: 1;
+}
+
+/* Bottom-sheet grab handle. Purely an affordance — the sheet isn't
+   drag-dismissable — but it marks the top edge as the sheet's, which is what
+   the old 1px top border was reaching for. */
+@media (max-width: 599px) {
+  .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border);
+  }
+}
+
+@media (min-width: 600px) {
+  .modal-header {
+    margin: 0 -24px 14px;
+    padding: 24px 24px 12px;
+  }
 }
 
 .modal-header--compact {
@@ -621,13 +716,15 @@ body {
   padding: 5px 10px;
   border-radius: 8px;
   line-height: 1.4;
-  transition: all 0.15s;
+  transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
   font-family: var(--font-body);
 }
 
-.modal-close:hover {
-  background: var(--surface2);
-  color: var(--text);
+@media (hover: hover) {
+  .modal-close:hover {
+    background: var(--surface2);
+    color: var(--text);
+  }
 }
 
 .btn-block {
@@ -651,6 +748,57 @@ body {
   position: static;
   box-shadow: none;
   margin-bottom: 14px;
+}
+
+/* The food picker is a browse surface: favourites, recents and recipes almost
+   always overflow, so it settles at the 85dvh cap anyway. Pinning it there
+   makes it open at that size on the first frame. Content-height sheets paint
+   at whatever has loaded and then grow — here that was a 234px sheet jumping
+   to 514px at ~50-110ms, in the middle of its own fade. */
+.modal--picker {
+  height: 85dvh;
+}
+
+@media (min-width: 600px) {
+  .modal--picker {
+    height: min(85dvh, 640px);
+  }
+}
+
+/* Placeholder rows shown for the ~50ms before the browse lists resolve, at the
+   same height as the real ones so nothing shifts when they swap in. */
+.search-result--skeleton {
+  pointer-events: none;
+}
+
+.sr-divider--skeleton {
+  height: 29px;
+}
+
+.sk-line {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--surface2) 25%, #f6f7fa 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: skShimmer 1.1s linear infinite;
+}
+
+.sk-line--name {
+  width: 58%;
+  height: 11px;
+  margin: 3px 0 6px;
+}
+
+.sk-line--meta {
+  width: 34%;
+  height: 9px;
+  margin-bottom: 3px;
+}
+
+@keyframes skShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
 }
 
 .form-group {
@@ -727,6 +875,7 @@ body {
 
 .form-input {
   width: 100%;
+  accent-color: var(--accent);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -735,7 +884,7 @@ body {
   font-size: 16px;
   font-family: var(--font-body);
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
   -webkit-appearance: none;
 }
 
@@ -778,7 +927,16 @@ body {
   font-family: var(--font-body);
   letter-spacing: 0.03em;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background var(--t-fast) var(--ease-out),
+              border-color var(--t-fast) var(--ease-out),
+              color var(--t-fast) var(--ease-out),
+              transform var(--t-fast) var(--ease-out);
+}
+
+/* Touch has no hover, so the press state is the only confirmation a button
+   registered at all. */
+.btn:active:not(:disabled) {
+  transform: scale(0.975);
 }
 
 .btn-primary {
@@ -786,8 +944,10 @@ body {
   color: white;
 }
 
-.btn-primary:hover {
-  background: var(--accent-dim);
+@media (hover: hover) {
+  .btn-primary:hover {
+    background: var(--accent-dim);
+  }
 }
 
 .btn-primary:disabled {
@@ -801,9 +961,11 @@ body {
   color: var(--text-muted);
 }
 
-.btn-ghost:hover {
-  background: var(--surface2);
-  color: var(--text);
+@media (hover: hover) {
+  .btn-ghost:hover {
+    background: var(--surface2);
+    color: var(--text);
+  }
 }
 
 .btn-sm {
@@ -825,7 +987,7 @@ body {
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
-  animation: quickActionsIn 0.18s ease-out;
+  animation: quickActionsIn var(--t-base) var(--ease-out);
 }
 
 .log-quick-cancel {
@@ -963,7 +1125,7 @@ body {
 .tab-bar {
   position: fixed;
   left: 50%;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%) translateY(8px);
   display: flex;
   gap: 4px;
@@ -974,7 +1136,7 @@ body {
   z-index: 40;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.28s ease, transform 0.28s ease;
+  transition: opacity var(--t-slow) var(--ease-out), transform var(--t-slow) var(--ease-out);
 }
 
 .tab-bar.visible {
@@ -1003,7 +1165,7 @@ body {
   padding: 10px 28px;
   border-radius: 999px;
   cursor: pointer;
-  transition: color 0.2s ease, background 0.2s ease;
+  transition: color var(--t-base) var(--ease-out), background var(--t-base) var(--ease-out);
 }
 
 .tab.active {
@@ -1014,7 +1176,7 @@ body {
 /* The tab bar is hidden at rest, so the FAB sits at its natural height and only
    shares the bottom edge with the bar during the brief moments it's shown. */
 .fab {
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ── Food view ───────────────────────────── */
@@ -1156,8 +1318,10 @@ body {
   border-bottom: none;
 }
 
-.search-result:hover {
-  background: var(--surface2);
+@media (hover: hover) {
+  .search-result:hover {
+    background: var(--surface2);
+  }
 }
 
 .sr-name {
@@ -1203,7 +1367,26 @@ body {
   background: var(--surface);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+}
+
+/* Only the diary's rows are drag-to-another-meal; the Foods manager reuses
+   .log-card for rows that just expand on tap. */
+.log-card[draggable="true"] {
   cursor: grab;
+}
+
+/* Touch has no hover, so a press state is the only feedback that a tap
+   registered before the modal opens. */
+.log-card:active,
+.entry-card:active,
+.search-result:active {
+  transform: scale(0.988);
+}
+
+.search-result:active {
+  background: var(--surface2);
 }
 
 .log-main {
@@ -1271,36 +1454,6 @@ body {
   gap: 4px;
 }
 
-/* Narrow viewports (the Fold's cover display): the name truncates with an
-   ellipsis rather than wrapping or pushing the stats onto their own row —
-   one dense line per card beats a taller card. kJ is the least essential
-   figure here, so it's the one dropped for space. */
-@media (max-width: 480px) {
-  .log-name,
-  .log-meta {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .log-kj-col {
-    display: none;
-  }
-  .log-macro-col {
-    width: 26px;
-  }
-  .log-kcal-col {
-    width: 52px;
-  }
-  .log-macro-label,
-  .log-macro-value,
-  .log-kcal {
-    font-size: 11px;
-  }
-  .kcal-suffix {
-    display: none;
-  }
-}
-
 .log-macro-col {
   display: flex;
   flex-direction: column;
@@ -1319,6 +1472,63 @@ body {
 .log-macro-value {
   font-size: 13px;
   color: var(--text);
+}
+
+/* Narrow viewports (the Fold's cover display, 475px CSS): the name truncates
+   with an ellipsis rather than wrapping or pushing the stats onto their own
+   row — one dense line per card beats a taller card. kJ is the least
+   essential figure here, so it's the one dropped for space.
+
+   This block has to stay *below* the .log-* rules it overrides. Media queries
+   contribute no specificity, so when it sat above them the base declarations
+   won on source order and only the two rules with no later counterpart (the
+   ellipsis and the kcal suffix) ever took effect. */
+@media (max-width: 520px) {
+  .log-name,
+  .log-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-kj-col {
+    display: none;
+  }
+  .log-macro-col {
+    width: 28px;
+  }
+  .log-kcal-col {
+    width: 52px;
+  }
+  .log-macro-label,
+  .log-macro-value,
+  .log-kcal {
+    font-size: 11px;
+  }
+  .log-kcal {
+    font-size: 15px;
+  }
+  .kcal-suffix {
+    display: none;
+  }
+}
+
+@media (min-width: 600px) {
+  .log-stats {
+    gap: 20px;
+  }
+  .log-macro-col {
+    width: 44px;
+  }
+  .log-kcal-col {
+    width: 88px;
+  }
+  .log-macro-label {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  .log-macro-value {
+    font-size: 14px;
+  }
 }
 
 /* ── Meal pills + macro preview ──────────── */
@@ -1393,7 +1603,9 @@ body {
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background var(--t-fast) var(--ease-out),
+              color var(--t-fast) var(--ease-out),
+              box-shadow var(--t-fast) var(--ease-out);
 }
 
 .food-tab.active {
@@ -1430,9 +1642,62 @@ body {
   color: #f5b301;
 }
 
+/* .btn declares no background, so a variant that doesn't set one falls through
+   to the user-agent's grey `buttonface` — which is what Delete was rendering
+   as, a grey slab next to the outlined Cancel beside it. Matches .btn-ghost's
+   shape, in the danger colour. */
 .btn-danger {
-  color: var(--danger, #e5484d);
+  background: none;
+  border-color: var(--border);
+  color: var(--danger);
   margin-right: auto;
+}
+
+@media (hover: hover) {
+  .btn-danger:hover {
+    background: rgba(201, 42, 42, 0.06);
+    border-color: rgba(201, 42, 42, 0.3);
+  }
+}
+
+/* The confirm sheet is deliberately short — a question and two buttons — so it
+   doesn't want the full-width feel of an editing sheet. */
+/* Only narrowed once it's a centred dialog. As a bottom sheet it has to stay
+   full width: a 400px cap left side gutters while the bottom corners still ran
+   square into the screen edge, so it read as a card that had been clipped
+   rather than as a sheet. */
+@media (min-width: 600px) {
+  .modal--confirm {
+    max-width: 400px;
+  }
+}
+
+.confirm-message {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  padding: 2px 0 4px;
+}
+
+/* Solid destructive button, for the sheet where deleting is the whole point.
+   .btn-danger stays the quiet outlined variant used beside Save/Cancel, where
+   Delete is one option among three rather than the action being confirmed. */
+.btn-danger-solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+@media (hover: hover) {
+  .btn-danger-solid:hover {
+    background: #b02525;
+    border-color: #b02525;
+  }
+}
+
+.btn-danger-solid:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Amount + unit toggle sit on one line: the number takes the space, the
@@ -1457,6 +1722,9 @@ body {
 .unit-toggle .meal-pill {
   flex: 0 0 auto;
   padding: 8px 12px;
+  min-width: 54px;
+  /* A unit is a unit: "g", not "G"; "cup", not "Cup". */
+  text-transform: none;
 }
 
 .meal-pill {
@@ -1470,7 +1738,14 @@ body {
   color: var(--text-muted);
   text-transform: capitalize;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background var(--t-fast) var(--ease-out),
+              border-color var(--t-fast) var(--ease-out),
+              color var(--t-fast) var(--ease-out),
+              transform var(--t-fast) var(--ease-out);
+}
+
+.meal-pill:active {
+  transform: scale(0.96);
 }
 
 .meal-pill.active {
@@ -1511,7 +1786,9 @@ body {
 .scanner-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  /* Above the FAB (100) and any modal (200): opened from the Foods manager it
+     mounts at the page root, where the FAB was drawing over the camera view. */
+  z-index: 300;
   background: #000;
   display: flex;
   flex-direction: column;
@@ -1575,26 +1852,33 @@ body {
 /* Direction is named for where the incoming panel travels: swiping left pulls
    the next tab in from the right edge. */
 .tab-panel.slide-left {
-  animation: tab-slide-left 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: tab-slide-left 190ms var(--ease-out);
 }
 
 .tab-panel.slide-right {
-  animation: tab-slide-right 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: tab-slide-right 190ms var(--ease-out);
 }
 
 @keyframes tab-slide-left {
-  from { opacity: 0; transform: translateX(28px); }
+  from { opacity: 0; transform: translateX(18px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes tab-slide-right {
-  from { opacity: 0; transform: translateX(-28px); }
+  from { opacity: 0; transform: translateX(-18px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* One global opt-out rather than a rule per animated thing — anything added
+   later is covered without having to remember. Durations are collapsed to
+   ~0 instead of `animation: none` so animations still fire their end state
+   and completion events. */
 @media (prefers-reduced-motion: reduce) {
-  .tab-panel.slide-left,
-  .tab-panel.slide-right {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

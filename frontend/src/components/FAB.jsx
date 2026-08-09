@@ -32,7 +32,13 @@ export default function FAB({ onClick, actions }) {
           <button
             key={a.label}
             className="fab-action"
-            style={{ bottom: `${32 + (i + 1) * 60}px` }}
+            // Stacked off the FAB's own bottom offset, safe-area included, so
+            // the dial stays anchored to the button when the app runs
+            // installed and the gesture bar pushes the FAB up.
+            style={{
+              bottom: `calc(24px + env(safe-area-inset-bottom, 0px) + ${(i + 1) * 58}px)`,
+              animationDelay: `${i * 35}ms`,
+            }}
             onClick={() => { setOpen(false); a.onClick() }}
           >
             {a.label}

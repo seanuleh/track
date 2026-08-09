@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createEntry, updateEntry } from '../api.js'
 import { today } from '../dates.js'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
 const MEDICATIONS = ['Mounjaro', 'WeGovy']
 
@@ -46,7 +46,7 @@ export default function AddEditModal({ entry, lastWeight, lastMedication, lastDo
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">{entry ? 'Edit entry' : 'Add entry'}</div>

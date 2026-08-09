@@ -39,6 +39,26 @@ To reverse a migration, write a new forward migration — never delete the old f
 > `users`, which is what cf-auth looks up. Never create a second `users` collection —
 > it fails on the name collision.
 
+## Looking at the UI — `probe/`
+
+Before changing anything visual, and after: `./probe/run.sh`. It restores the
+newest backup into a throwaway PocketBase container, seeds a probe user with a
+realistic day's data, starts vite, and drives the real app in Chromium at the
+**measured** Galaxy Z Fold 8 widths (cover 475px, unfolded 674px) plus desktop —
+screenshotting every surface and asserting the things that only break in a
+browser. Production is never touched.
+
+**Read [`probe/README.md`](probe/README.md) first.** It records the traps that
+each cost a debugging cycle: Playwright not Selenium (no chrome/chromedriver on
+this host, and installing one needs root); auth seeded into `localStorage`
+rather than through a login screen that doesn't exist; and why a forced click on
+the tab bar hits the card underneath it.
+
+Several bugs found this way were invisible in the source — a `@media` block
+placed above the rules it overrode so half of it never applied, a sticky modal
+header 18px narrower than its sheet, a pixel-positioned indicator that never
+re-measured on unfold. Add a check when you fix something; don't delete one.
+
 ## Current Deployment
 
 Live at `track.uleh.tv` on the uleh home server.
@@ -89,6 +109,7 @@ track/
 ├── Dockerfile               # Multi-stage: Vite build → PocketBase + pb_public
 ├── README.md
 ├── CLAUDE.md
+├── probe/                   # Browser harness: throwaway backend + Playwright (README.md)
 ├── pocketbase/
 │   ├── entrypoint.sh        # Idempotent init: admin + users collection + weight_entries
 │   └── pb_hooks/
@@ -114,8 +135,11 @@ track/
             ├── RecipeGroupModal.jsx # Edit/delete a logged recipe as one unit (meal, servings eaten)
             ├── RecipeLogModal.jsx # Edit-before-log: adjust a recipe's items before it's logged
             ├── TargetsModal.jsx   # Set a new daily kcal/macro target, effective from today
+            ├── ConfirmModal.jsx   # In-app replacement for window.confirm; stacks over its parent
             └── FAB.jsx            # Fixed + button
 ```
+
+`probe/` (repo root) holds the browser harness — see "Looking at the UI" above.
 
 Auth is handled by the cf-auth sidecar outside the container — no auth code in the app itself.
 
@@ -283,6 +307,36 @@ the default behaviour because it's a direct handler on the real input reacting t
 genuine click, not the detached-trigger pattern the paragraph above warns about. The
 label text itself is `formatDisplayDate` from `dates.js` ("Sat, 8th Aug 2026"), not the
 raw `YYYY-MM-DD` string — `today()` still renders as "Today".
+
+### Motion and modals
+
+All timing and easing comes from four custom properties on `:root`
+(`--ease-out`, `--ease-spring`, `--t-fast|base|slow`). Add transitions using
+those rather than inventing a duration, and **always name the properties being
+transitioned** — `transition: all` was used throughout and would animate
+whatever happened to change, including layout properties.
+
+Every `:hover` is wrapped in `@media (hover: hover)`. A touch tap latches hover
+onto the element it landed on until something else is tapped, so an un-gated
+hover shows as a row that stays highlighted after you've let go. Use `:active`
+for touch feedback instead.
+
+Modals are bottom sheets under 600px and centred dialogs above it. Three rules
+they all follow:
+
+- **Open at final size.** A sheet whose content loads after mount paints short
+  and then grows, mid-fade. Either pin the height (`.modal--picker`) or reserve
+  the space with skeleton rows. `probe/probe5.js` checks this.
+- **The sheet animates opacity only, never `translateY`.** The browser
+  repositions it as the keyboard opens and a transform fights that.
+- **Dismissal uses `overlayDismiss` from `modalKeys.js`**, not a bare `onClick`
+  on the overlay: a plain click handler fires on the common ancestor of press
+  and release, so selecting text in a field and letting go outside the sheet
+  discarded the edit.
+
+`window.confirm`/`alert` are not used — `ConfirmModal.jsx` is the in-app
+equivalent. It stacks above whichever modal opened it, and `useEscapeClose`
+keeps a mount-ordered stack so Escape dismisses only the topmost.
 
 ### Daily targets
 

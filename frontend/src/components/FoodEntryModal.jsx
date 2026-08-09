@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { createFood, logFood, updateLog, deleteLog, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
+import ConfirmModal from './ConfirmModal.jsx'
 import { today, shiftDate } from '../dates.js'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -47,6 +48,7 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
   const [entryDate, setEntryDate] = useState(isEditing ? log.date : (presetDate || today()))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState(null)
 
   // Manual-entry fields — the same form the Foods manager uses.
@@ -97,7 +99,7 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
   }
 
   async function handleDelete() {
-    if (!confirm('Remove this entry?')) return
+    setConfirmDelete(false)
     setDeleting(true)
     setError(null)
     try {
@@ -110,7 +112,8 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">
@@ -212,7 +215,7 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
 
           <div className="modal-actions modal-actions--compact">
             {isEditing && (
-              <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting || saving}>
+              <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)} disabled={deleting || saving}>
                 {deleting ? 'Removing…' : 'Delete'}
               </button>
             )}
@@ -224,5 +227,17 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
         </form>
       </div>
     </div>
+
+    {confirmDelete && (
+      <ConfirmModal
+        title="Remove this entry?"
+        message={`${food?.name || 'This entry'} will be taken off ${entryDate === today() ? 'today' : entryDate}.`}
+        confirmLabel="Remove"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+    )}
+    </>
   )
 }

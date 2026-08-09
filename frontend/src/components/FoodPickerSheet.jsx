@@ -6,7 +6,7 @@ import {
 import Scanner from './Scanner.jsx'
 import FoodEntryModal from './FoodEntryModal.jsx'
 import RecipeLogModal from './RecipeLogModal.jsx'
-import { useEscapeClose } from '../modalKeys.js'
+import { useEscapeClose, overlayDismiss } from '../modalKeys.js'
 
 // Per-serving kcal for a recipe — same math as RecipesView, duplicated rather
 // than imported because it's a private helper there, not part of the API surface.
@@ -31,7 +31,7 @@ async function recipeKcal(recipe, foodCache) {
  * dragging a logged entry between meal sections is the other way to fix it
  * up afterwards.
  *
- * Before you type: recents and favourites, so re-logging something you eat
+ * Before you type: favourites then recents, so re-logging something you eat
  * constantly is zero typing. After you type: your own foods, then the local
  * Open Food Facts mirror — same ranking as the old diary search.
  */
@@ -45,19 +45,30 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
   const [recipes, setRecipes] = useState([])
   const [recipeKcals, setRecipeKcals] = useState({}) // recipe.id -> per-serving kcal
   const [scanning, setScanning] = useState(false)
+  // The browse lists arrive a tick after mount. Until they do the sheet has
+  // nothing to show, so it would paint short and then grow — see the skeleton
+  // rows and the fixed sheet height below.
+  const [browseLoaded, setBrowseLoaded] = useState(false)
   const [status, setStatus] = useState(null)
   const [entry, setEntry] = useState(null) // { food, catalog, barcode } for FoodEntryModal
   const [loggingRecipe, setLoggingRecipe] = useState(null) // recipe opened for edit-before-log
 
   useEffect(() => {
-    getRecentFoods(8).then(setRecents).catch(() => {})
-    getFavouriteFoods(20).then(setFavourites).catch(() => {})
-    getRecipes().then(async list => {
-      setRecipes(list)
-      const foodCache = new Map()
-      const entries = await Promise.all(list.map(async r => [r.id, await recipeKcal(r, foodCache)]))
-      setRecipeKcals(Object.fromEntries(entries))
-    }).catch(() => {})
+    // Settled together, so the list appears in one step rather than three:
+    // favourites landing, then recents, then recipes each reflowed the sheet.
+    // The per-recipe kcal figures are deliberately *not* waited on — they fill
+    // in a row's subtitle without changing its height.
+    Promise.allSettled([
+      getRecentFoods(8).then(setRecents),
+      getFavouriteFoods(20).then(setFavourites),
+      getRecipes().then(list => {
+        setRecipes(list)
+        const foodCache = new Map()
+        Promise.all(list.map(async r => [r.id, await recipeKcal(r, foodCache)]))
+          .then(entries => setRecipeKcals(Object.fromEntries(entries)))
+          .catch(() => {})
+      }),
+    ]).then(() => setBrowseLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -118,10 +129,15 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
     )
   }
 
-  // Favourites not already surfaced by recents, so the same food isn't listed twice.
-  const recentIds = new Set(recents.map(f => f.id))
-  const favouritesOnly = favourites.filter(f => !recentIds.has(f.id))
-  const showBrowse = !query.trim() && (recents.length > 0 || favouritesOnly.length > 0 || recipes.length > 0)
+  // Favourites lead; recents already pinned as favourites aren't listed twice.
+  // Favourited recipes are favourites too — they join the same block rather
+  // than hiding at the bottom under Recipes.
+  const favouriteIds = new Set(favourites.map(f => f.id))
+  const recentsOnly = recents.filter(f => !favouriteIds.has(f.id))
+  const favRecipes = recipes.filter(r => r.favourite)
+  const restRecipes = recipes.filter(r => !r.favourite)
+  const showBrowse = !query.trim() &&
+    (favourites.length > 0 || favRecipes.length > 0 || recentsOnly.length > 0 || recipes.length > 0)
 
   // Client-filtered — the recipe library is small (dozens, not thousands),
   // so a server round-trip per keystroke isn't worth it.
@@ -146,8 +162,11 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
+      {/* Fixed height, not content height: this sheet's list is long enough to
+          hit the 85dvh cap in practice, so pinning it there means it opens at
+          its final size instead of painting short and expanding mid-fade. */}
+      <div className="modal modal--picker">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">{meal ? `Add to ${meal}` : 'Add food'}</div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -203,10 +222,23 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
               ))}
             </div>
           )
+        ) : !browseLoaded ? (
+          // Placeholder rows at the real row height. Without them the sheet is
+          // a blank panel for the ~50ms the lists take, which reads as a flash.
+          <div className="search-results search-results--sheet" aria-hidden="true">
+            <div className="sr-divider sr-divider--skeleton" />
+            {Array.from({ length: 6 }, (_, i) => (
+              <div className="search-result search-result--skeleton" key={i}>
+                <span className="sk-line sk-line--name" />
+                <span className="sk-line sk-line--meta" />
+              </div>
+            ))}
+          </div>
         ) : showBrowse && (
           <div className="search-results search-results--sheet">
-            {recents.length > 0 && <div className="sr-divider">Recent</div>}
-            {recents.map(f => (
+            {(favourites.length > 0 || favRecipes.length > 0) && <div className="sr-divider">Favourites</div>}
+            {favRecipes.map(recipeButton)}
+            {favourites.map(f => (
               <button key={f.id} type="button" className="search-result" onClick={() => setEntry({ food: f })}>
                 <span className="sr-name">{f.name}</span>
                 <span className="sr-meta">
@@ -215,8 +247,8 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
                 </span>
               </button>
             ))}
-            {favouritesOnly.length > 0 && <div className="sr-divider">Favourites</div>}
-            {favouritesOnly.map(f => (
+            {recentsOnly.length > 0 && <div className="sr-divider">Recent</div>}
+            {recentsOnly.map(f => (
               <button key={f.id} type="button" className="search-result" onClick={() => setEntry({ food: f })}>
                 <span className="sr-name">{f.name}</span>
                 <span className="sr-meta">
@@ -225,8 +257,8 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
                 </span>
               </button>
             ))}
-            {recipes.length > 0 && <div className="sr-divider">Recipes</div>}
-            {recipes.map(recipeButton)}
+            {restRecipes.length > 0 && <div className="sr-divider">Recipes</div>}
+            {restRecipes.map(recipeButton)}
           </div>
         )}
       </div>

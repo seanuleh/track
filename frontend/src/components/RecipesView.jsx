@@ -5,6 +5,7 @@ import RecipeLogModal from './RecipeLogModal.jsx'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
 import FAB from './FAB.jsx'
+import ConfirmModal from './ConfirmModal.jsx'
 
 /** The recipe library — list, create, edit, delete. No logging here; that's the diary's job. */
 export default function RecipesView() {
@@ -16,6 +17,8 @@ export default function RecipesView() {
   const [expandedId, setExpandedId] = useState(null) // recipe.id showing Edit/Vary/Delete instead of macros
   const [logging, setLogging] = useState(null) // { recipe } for RecipeLogModal, opened from Add
   const [status, setStatus] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null) // recipe pending deletion
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -35,14 +38,18 @@ export default function RecipesView() {
 
   useEffect(() => { load() }, [load])
 
-  async function handleDelete(e, recipe) {
-    e.stopPropagation()
-    if (!confirm(`Delete ${recipe.name}?`)) return
+  async function handleDelete() {
+    const recipe = confirmDelete
+    setDeleting(true)
     try {
       await deleteRecipe(recipe.id)
+      setConfirmDelete(null)
+      setExpandedId(null)
       load()
     } catch (err) {
       setError(err.message)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -89,7 +96,11 @@ export default function RecipesView() {
                 >
                   Add
                 </button>
-                <button className="icon-btn danger" onClick={e => handleDelete(e, recipe)}>✕</button>
+                <button
+                  className="icon-btn danger"
+                  aria-label={`Delete ${recipe.name}`}
+                  onClick={e => { e.stopPropagation(); setConfirmDelete(recipe) }}
+                >✕</button>
               </div>
             ) : (
               totals[recipe.id] && (
@@ -112,6 +123,16 @@ export default function RecipesView() {
           recipe={editing.recipe}
           onSaved={() => { setEditing(null); load() }}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete ${confirmDelete.name}?`}
+          message="Days it was already logged into keep their entries — a recipe is a template, so deleting it doesn't rewrite history."
+          busy={deleting}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
 

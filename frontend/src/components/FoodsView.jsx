@@ -48,6 +48,16 @@ export default function FoodsView() {
     return () => clearTimeout(t)
   }, [query])
 
+  // "Logged." and the like are confirmations, not state — left up they turn
+  // into a stale banner that sits above the list for the rest of the session
+  // and pushes it down. "Looking up…" is excluded: that one is cleared by the
+  // lookup finishing, and expiring it early would hide live progress.
+  useEffect(() => {
+    if (!status || status.endsWith('…')) return
+    const t = setTimeout(() => setStatus(null), 2500)
+    return () => clearTimeout(t)
+  }, [status])
+
   const load = useCallback(async (targetPage, replace) => {
     try {
       const res = await listFoods({ query: debounced, page: targetPage })
@@ -62,8 +72,17 @@ export default function FoodsView() {
     }
   }, [debounced])
 
-  // A new search always restarts at page 1.
-  useEffect(() => { setLoading(true); load(1, true) }, [load])
+  // A new search always restarts at page 1. Only the very first load shows the
+  // "Loading…" block: on a search it appears *above* the results that are still
+  // on screen, so every debounced keystroke shoved the whole list down 80px and
+  // let it spring back. Re-searching just leaves the previous results up until
+  // the new ones land.
+  const firstLoad = useRef(true)
+  useEffect(() => {
+    if (firstLoad.current) setLoading(true)
+    firstLoad.current = false
+    load(1, true)
+  }, [load])
 
   // Recipes appear in the Foods list too, so they can be favourited and found
   // the same way — the library is small, so a full fetch each search is fine.

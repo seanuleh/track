@@ -359,7 +359,7 @@ export async function copyLogs(logs, targetDate) {
 // ── recipes ──────────────────────────────────────────────────────────────
 
 export async function getRecipes() {
-  return pb.collection('recipes').getFullList({ sort: 'name' })
+  return pb.collection('recipes').getFullList({ sort: '-favourite,name' })
 }
 
 export async function createRecipe({ name, items, servings }) {

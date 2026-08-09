@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { updateLogGroupMeal, scaleLogGroup, deleteLogGroup } from '../food/api.js'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
+import ConfirmModal from './ConfirmModal.jsx'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -21,6 +22,7 @@ export default function RecipeGroupModal({ entry, onSaved, onClose }) {
   const [servings, setServings] = useState('1')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState(null)
 
   async function handleSubmit(e) {
@@ -41,7 +43,7 @@ export default function RecipeGroupModal({ entry, onSaved, onClose }) {
   }
 
   async function handleDelete() {
-    if (!confirm(`Remove ${entry.recipe_name}?`)) return
+    setConfirmDelete(false)
     setDeleting(true)
     setError(null)
     try {
@@ -54,7 +56,8 @@ export default function RecipeGroupModal({ entry, onSaved, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">{entry.recipe_name || 'Recipe'}</div>
@@ -95,7 +98,7 @@ export default function RecipeGroupModal({ entry, onSaved, onClose }) {
           {error && <div className="form-error">{error}</div>}
 
           <div className="modal-actions modal-actions--compact">
-            <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting || saving}>
+            <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)} disabled={deleting || saving}>
               {deleting ? 'Removing…' : 'Delete'}
             </button>
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
@@ -106,5 +109,17 @@ export default function RecipeGroupModal({ entry, onSaved, onClose }) {
         </form>
       </div>
     </div>
+
+    {confirmDelete && (
+      <ConfirmModal
+        title={`Remove ${entry.recipe_name || 'this recipe'}?`}
+        message={`All ${entry.items.length} logged ingredient${entry.items.length === 1 ? '' : 's'} from this serving will be removed. The recipe itself is not affected.`}
+        confirmLabel="Remove"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+    )}
+    </>
   )
 }

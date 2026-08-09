@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
 import { createFood, updateFood, deleteFood, countLogsForFood, extractNutritionFromImage } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
+import ConfirmModal from './ConfirmModal.jsx'
 
 // Keeps the upload small and the vision model fast — a nutrition panel is
 // legible from a phone camera well below full resolution.
@@ -40,6 +41,9 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [scanning, setScanning] = useState(false)
+  // null until the usage count comes back; then { used } drives the confirm sheet.
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [counting, setCounting] = useState(false)
   const fileInputRef = useRef(null)
 
   async function handlePhoto(e) {
@@ -85,30 +89,37 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
     }
   }
 
+  // Deleting a food that history points at would leave those logs as "Unknown
+  // food" with no macros, quietly changing past totals — so count them first
+  // and say how many, before the confirm sheet goes up.
+  async function requestDelete() {
+    setError(null)
+    setCounting(true)
+    try {
+      setConfirmDelete({ used: await countLogsForFood(food.id) })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCounting(false)
+    }
+  }
+
   async function handleDelete() {
     setError(null)
+    setSaving(true)
     try {
-      // Deleting a food that history points at would leave those logs as
-      // "Unknown food" with no macros, quietly changing past totals — so say
-      // how many before asking.
-      const used = await countLogsForFood(food.id)
-      const warning = used > 0
-        ? `${food.name} is used by ${used} logged ${used === 1 ? 'entry' : 'entries'}. ` +
-          'Deleting it will leave those entries with no food and no calories. Continue?'
-        : `Delete ${food.name}?`
-      if (!confirm(warning)) return
-
-      setSaving(true)
       await deleteFood(food.id)
       onSaved()
     } catch (err) {
+      setConfirmDelete(null)
       setError(err.message)
       setSaving(false)
     }
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">
@@ -154,8 +165,8 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
 
           <div className="modal-actions modal-actions--compact">
             {!isNew && (
-              <button type="button" className="btn btn-ghost btn-danger" onClick={handleDelete} disabled={saving}>
-                Delete
+              <button type="button" className="btn btn-danger" onClick={requestDelete} disabled={saving || counting}>
+                {counting ? 'Checking…' : 'Delete'}
               </button>
             )}
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
@@ -166,5 +177,18 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
         </form>
       </div>
     </div>
+
+    {confirmDelete && (
+      <ConfirmModal
+        title={`Delete ${food.name}?`}
+        message={confirmDelete.used > 0
+          ? `It's used by ${confirmDelete.used} logged ${confirmDelete.used === 1 ? 'entry' : 'entries'}. Deleting it leaves ${confirmDelete.used === 1 ? 'that entry' : 'those entries'} with no food and no calories, changing what those days say you ate.`
+          : 'Nothing has been logged against it, so no history changes.'}
+        busy={saving}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
+    )}
+    </>
   )
 }

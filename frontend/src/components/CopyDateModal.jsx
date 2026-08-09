@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { copyLogs } from '../food/api.js'
 import { today, shiftDate, formatDisplayDate } from '../dates.js'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
 const NEXT_7_DAYS = Array.from({ length: 7 }, (_, i) => shiftDate(today(), i + 1))
 
@@ -43,7 +43,7 @@ export default function CopyDateModal({ logs, label, onCopied, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">{label}</div>

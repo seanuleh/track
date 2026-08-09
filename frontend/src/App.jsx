@@ -3,10 +3,11 @@ import { getEntries, deleteEntry } from './api.js'
 import WeightChart, { getLegendKeys } from './components/WeightChart.jsx'
 import EntryList from './components/EntryList.jsx'
 import AddEditModal from './components/AddEditModal.jsx'
+import ConfirmModal from './components/ConfirmModal.jsx'
 import FAB from './components/FAB.jsx'
 import FoodView from './components/FoodView.jsx'
 import FoodsView from './components/FoodsView.jsx'
-import { toLocalISO } from './dates.js'
+import { toLocalISO, formatDisplayDate } from './dates.js'
 import { buildColorMap, formatMedLabel, NO_MED_COLOR } from './medColors.js'
 
 const WINDOWS = [
@@ -46,39 +47,26 @@ function chartHeightForData(data) {
   return 300
 }
 
+/**
+ * Wraps the chart so a change of window animates its height instead of jumping
+ * (1W is 180px tall, All is 300px), and carries the medication legend.
+ *
+ * This used to keep the outgoing chart mounted for 450ms to cross-fade it, but
+ * that layer was rendered at `opacity: 0` from its very first frame — there was
+ * no starting opacity to transition down from, so it never actually appeared.
+ * All it did was render a second full Recharts tree on every pill tap, on the
+ * one screen where the phone is already busiest. The incoming chart animates
+ * itself in (`isAnimationActive` on the Area), which is the fade that was
+ * always doing the work.
+ */
 function ChartCrossfade({ chartData, entries }) {
-  const [current, setCurrent] = useState({ key: 0, data: chartData, allEntries: entries })
-  const [prev, setPrev] = useState(null)
-  const timerRef = useRef(null)
-  const initRef = useRef(true)
-
-  useEffect(() => {
-    if (initRef.current) { initRef.current = false; return }
-    clearTimeout(timerRef.current)
-    setPrev({ ...current, fading: true })
-    const nextKey = current.key + 1
-    setCurrent({ key: nextKey, data: chartData, allEntries: entries })
-    timerRef.current = setTimeout(() => setPrev(null), 450)
-    return () => clearTimeout(timerRef.current)
-  }, [chartData]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const targetHeight = chartHeightForData(chartData)
-  const prevHeight = prev ? chartHeightForData(prev.data) : targetHeight
-  const containerHeight = Math.max(targetHeight, prevHeight)
-
-  const { keys: legendKeys, colorMap: legendColorMap } = getLegendKeys(current.data, current.allEntries)
+  const height = chartHeightForData(chartData)
+  const { keys: legendKeys, colorMap: legendColorMap } = getLegendKeys(chartData, entries)
 
   return (
     <div>
-      <div style={{ position: 'relative', height: containerHeight, transition: 'height 0.4s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
-        {prev && (
-          <div style={{ position: 'absolute', inset: 0, opacity: 0, transition: 'opacity 0.25s ease', pointerEvents: 'none' }}>
-            <WeightChart key={prev.key} data={prev.data} allEntries={prev.allEntries} />
-          </div>
-        )}
-        <div style={{ position: 'absolute', inset: 0, opacity: 1, transition: 'opacity 0.25s ease 0.1s' }}>
-          <WeightChart key={current.key} data={current.data} allEntries={current.allEntries} />
-        </div>
+      <div style={{ height, transition: 'height 280ms cubic-bezier(0.2, 0, 0, 1)', overflow: 'hidden' }}>
+        <WeightChart data={chartData} allEntries={entries} />
       </div>
       {legendKeys.length > 0 && (
         <div className="chart-legend">
@@ -101,6 +89,11 @@ function WeightView() {
   const [window_, setWindow_] = useState(() => localStorage.getItem('weightWindow') || '3M')
   const [modalOpen, setModalOpen] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null) // entry pending deletion
+  const [deleting, setDeleting] = useState(false)
+  // `error` is fatal — it replaces the whole view. A failed delete is not: the
+  // list is still valid and still on screen, so it gets its own inline banner.
+  const [actionError, setActionError] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -131,13 +124,27 @@ function WeightView() {
   const pillRefs = useRef({})
   const [indicator, setIndicator] = useState(null)
 
+  // The indicator is positioned in pixels, so it has to be re-measured whenever
+  // the pills themselves move — not only when the selection changes. Unfolding
+  // the phone resizes the same webview live (no reload), which re-lays-out the
+  // pill row underneath an indicator still parked at its cover-screen offset;
+  // it sat ~50px left of the selected pill until the next tap.
   useEffect(() => {
     const container = pillsRef.current
-    const activeEl = pillRefs.current[window_]
-    if (!container || !activeEl) return
-    const cRect = container.getBoundingClientRect()
-    const aRect = activeEl.getBoundingClientRect()
-    setIndicator({ left: aRect.left - cRect.left, width: aRect.width })
+    if (!container) return
+
+    function measure() {
+      const activeEl = pillRefs.current[window_]
+      if (!activeEl) return
+      const cRect = container.getBoundingClientRect()
+      const aRect = activeEl.getBoundingClientRect()
+      setIndicator({ left: aRect.left - cRect.left, width: aRect.width })
+    }
+
+    measure()
+    const obs = new ResizeObserver(measure)
+    obs.observe(container)
+    return () => obs.disconnect()
   }, [window_, loading])
 
   const selectedWindow = WINDOWS.find(w => w.label === window_)
@@ -161,13 +168,19 @@ function WeightView() {
     setModalOpen(true)
   }
 
-  async function handleDelete(id) {
-    if (!confirm('Delete this entry?')) return
+  async function handleDelete() {
+    setDeleting(true)
     try {
-      await deleteEntry(id)
+      await deleteEntry(confirmDelete.id)
+      setConfirmDelete(null)
       await load()
     } catch (err) {
-      alert('Failed to delete: ' + err.message)
+      // An alert() on top of the app's own error styling was two pieces of
+      // chrome saying the same thing, one of them unstyled.
+      setConfirmDelete(null)
+      setActionError('Could not delete that entry — ' + err.message)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -205,6 +218,8 @@ function WeightView() {
         </div>
       </div>
 
+      {actionError && <div className="form-error">{actionError}</div>}
+
       <div className="window-pills" ref={pillsRef}>
         <div className="pill-indicator" style={indicator ? { left: indicator.left, width: indicator.width } : { transition: 'none', left: 0, width: 0 }} />
         {WINDOWS.map(w => (
@@ -228,7 +243,7 @@ function WeightView() {
         <EntryList
           entries={filtered.filter(e => !e._anchor)}
           onEdit={handleEdit}
-          onDelete={handleDelete}
+          onDelete={id => setConfirmDelete(entries.find(e => e.id === id) || { id })}
           colorMap={colorMap}
         />
         {filtered.length === 0 && (
@@ -237,6 +252,18 @@ function WeightView() {
       </div>
 
       <FAB onClick={() => { setEditEntry(null); setModalOpen(true) }} />
+
+      {confirmDelete && (
+        <ConfirmModal
+          title="Delete this entry?"
+          message={confirmDelete.weight != null
+            ? `${parseFloat(confirmDelete.weight).toFixed(1)} kg on ${formatDisplayDate(confirmDelete.date)}.`
+            : null}
+          busy={deleting}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
 
       {modalOpen && (
         <AddEditModal
@@ -268,9 +295,10 @@ const SWIPE_MIN_X = 60
 const SWIPE_RATIO = 1.5
 
 // A swipe that starts inside one of these is meant for that element, not the
-// tab strip: the scanner and modals sit above the page, and the search results
-// are their own scrollable list.
-const SWIPE_EXEMPT = '.scanner-overlay, .modal-overlay, .search-results'
+// tab strip: the scanner and modals sit above the page, the search results are
+// their own scrollable list, and a horizontal drag across the weight chart is
+// reading the chart (it tracks the tooltip), not asking to change tab.
+const SWIPE_EXEMPT = '.scanner-overlay, .modal-overlay, .search-results, .recharts-wrapper'
 
 // How far past SWIPE_MIN_X a gesture must get before the pill bar is revealed.
 // Lower than the commit threshold so the bar shows up as confirmation while the

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createRecipe, updateRecipe, getFood, gramsFor, macrosFor } from '../food/api.js'
 import FoodPicker from './FoodPicker.jsx'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
 /**
  * Create or edit a recipe: name, servings, and a list of
@@ -101,7 +101,7 @@ export default function RecipeBuilderModal({ recipe, onSaved, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">{isNew ? 'New recipe' : 'Edit recipe'}</div>

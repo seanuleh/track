@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { setTarget } from '../food/api.js'
 import { today } from '../dates.js'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
 /**
  * Sets a new daily target, effective from today. Never edits an existing
@@ -35,7 +35,7 @@ export default function TargetsModal({ current, onSaved, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">Daily target</div>

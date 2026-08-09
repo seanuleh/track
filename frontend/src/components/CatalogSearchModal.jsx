@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { searchCatalog, ensureFoodFromCatalog } from '../food/api.js'
 import MacroLine from './MacroLine.jsx'
 import KcalCol from './KcalCol.jsx'
-import { useEscapeClose } from '../modalKeys.js'
+import { useEscapeClose, overlayDismiss } from '../modalKeys.js'
 
 /**
  * Search the local Open Food Facts mirror and promote a hit into `foods`.
@@ -46,7 +46,7 @@ export default function CatalogSearchModal({ onPicked, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">Search Open Food Facts</div>

@@ -3,7 +3,7 @@ import { getFood, gramsFor, macrosFor, logRecipeItems, createRecipe } from '../f
 import FoodPicker from './FoodPicker.jsx'
 import { defaultMeal } from './FoodEntryModal.jsx'
 import { today, shiftDate } from '../dates.js'
-import { useEscapeClose, onFormKeyDown } from '../modalKeys.js'
+import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -129,7 +129,7 @@ export default function RecipeLogModal({ recipe, date: presetDate, meal: presetM
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" {...overlayDismiss(onClose)}>
       <div className="modal">
         <div className="modal-header modal-header--compact">
           <div className="modal-title modal-title--compact">{recipe.name}</div>
