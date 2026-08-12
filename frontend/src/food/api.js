@@ -13,6 +13,23 @@ export async function findFoodByBarcode(barcode) {
   return rows.items[0] || null
 }
 
+/**
+ * Find an already-copied food that has no barcode to match on.
+ *
+ * AFCD whole foods and bakery items are sold without a pack, so barcode — the
+ * identity used everywhere else here — is empty and `'' = ''` matches every
+ * other unbarcoded food. Name plus brand is the only identity they have. Exact
+ * match, not `~`: "Banana, cavendish, peeled, raw" and "Banana, frozen" are
+ * genuinely different foods with different macros.
+ */
+export async function findFoodByName(name, brand = '') {
+  const rows = await pb.collection('foods').getList(1, 1, {
+    filter: pb.filter('barcode = "" && name = {:name} && brand = {:brand}',
+      { name, brand }),
+  })
+  return rows.items[0] || null
+}
+
 export async function createFood(food) {
   return pb.collection('foods').create(food)
 }
@@ -59,7 +76,8 @@ export async function listFoods({ query = '', page = 1, perPage = 50 } = {}) {
 // ── food_catalog ─────────────────────────────────────────────────────────
 
 /**
- * Search the local Open Food Facts mirror (~75k AU/NZ products).
+ * Search the local food catalog — ~75k AU/NZ Open Food Facts products plus the
+ * ~1.6k AFCD whole foods (`source` tells them apart).
  *
  * Local, so it's fast enough to run as you type and works with OFF down or
  * offline. Ranked by name matches before brand matches — typing "tim tam"
@@ -67,10 +85,30 @@ export async function listFoods({ query = '', page = 1, perPage = 50 } = {}) {
  */
 export async function searchCatalog(query, limit = 20) {
   if (!query.trim()) return []
-  const rows = await pb.collection('food_catalog').getList(1, limit, {
-    filter: wordFilter(query),
-    sort: 'name',
-  })
+  const filter = wordFilter(query)
+
+  // Two queries, not one. PocketBase sorts server-side and truncates at
+  // `limit`, and OFF outnumbers AFCD 47:1 — sorted by name, "chicken breast"
+  // filled all 20 slots with branded schnitzels and pub meals before reaching
+  // "Chicken, breast, lean flesh, raw". The whole point of importing AFCD is
+  // that it answers exactly the queries OFF answers worst, so it gets its own
+  // slots rather than competing for the same page of results.
+  const [branded, whole] = await Promise.all([
+    pb.collection('food_catalog').getList(1, limit, { filter, sort: 'name' }),
+    pb.collection('food_catalog').getList(1, Math.ceil(limit / 2), {
+      filter: `(${filter}) && source = 'afcd'`,
+      sort: 'name',
+    }),
+  ])
+
+  const merged = []
+  const seen = new Set()
+  for (const item of [...whole.items, ...branded.items]) {
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
+  }
+
   // Rank client-side: a name that starts with what you typed is almost always
   // what you meant, and a shorter name beats a longer one carrying pack sizes
   // and marketing ("Vegemite" over "Vegemite 455g Spread Jar").
@@ -81,9 +119,9 @@ export async function searchCatalog(query, limit = 20) {
     if (name.includes(q)) return 1
     return 2
   }
-  return rows.items.sort(
-    (a, b) => score(a) - score(b) || (a.name || '').length - (b.name || '').length
-  )
+  return merged
+    .sort((a, b) => score(a) - score(b) || (a.name || '').length - (b.name || '').length)
+    .slice(0, limit)
 }
 
 /**
@@ -101,12 +139,21 @@ export async function ensureFoodFromCatalog(item) {
   if (item.barcode) {
     const existing = await findFoodByBarcode(item.barcode)
     if (existing) return existing
+  } else {
+    // Without this, logging the same AFCD food twice creates a second `foods`
+    // row each time: the barcode check above can't run, so every log of
+    // "Chicken, breast, lean flesh, raw" was a fresh copy.
+    const existing = await findFoodByName(item.name, item.brand || '')
+    if (existing) return existing
   }
   return createFood({
     barcode: item.barcode || '',
     name: item.name,
     brand: item.brand || '',
-    source: 'off',
+    // Carry the catalog row's provenance rather than assuming OFF: the mirror
+    // also holds AFCD whole foods, and `foods.source` is what tells a barcode
+    // cache entry apart from a government reference value later.
+    source: item.source || 'off',
     serving_g: item.serving_g || null,
     kcal: item.kcal, protein: item.protein, fat: item.fat, carbs: item.carbs,
     fiber: item.fiber, sugar: item.sugar, sodium: item.sodium,

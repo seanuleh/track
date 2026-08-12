@@ -351,7 +351,30 @@ filter by date.
 
 Not done (no request for it yet): duplicating a single entry.
 
-### 9. AFCD whole foods — **low priority**
+### 9. AFCD whole foods — ✅ **done 2026-08-12**
+
+Shipped as `scripts/afcd-import.py` + migration `1786517284_food_catalog_source.js`:
+1,588 AFCD Release 3 foods in `food_catalog` with `source = 'afcd'`. See CLAUDE.md's
+"AFCD whole foods" section for the extract decisions (energy *with* dietary fibre,
+available carbohydrate, per-100 g sheet only) and how to re-run it.
+
+The predicted trap was real, and there was a second one:
+
+- The unique `barcode` index did reject the second barcode-less row. Relaxed to a
+  partial index (`WHERE barcode != ''`), plus a partial unique `(source, source_id)`
+  for idempotent re-import.
+- **Not predicted:** importing wasn't enough to make the foods *findable*. PocketBase
+  sorts and truncates server-side, and OFF outnumbers AFCD 47:1, so "chicken breast"
+  still returned 20 branded schnitzels. `searchCatalog` now runs a second AFCD-only
+  query and merges. Worth remembering for any future source added to this collection —
+  a minority source is invisible without its own slots.
+
+The commercial alternatives below were re-checked at the same time and both stay
+rejected: **FSANZ's Branded Food Database** still has no public download (submission
+portal only, published subset permission-gated per provider), and **CalorieKing AU** is
+commercial-licence-only with no pricing, self-serve signup or free tier.
+
+Original note follows.
 
 The one real gap the OFF mirror leaves. OFF is a *barcode* database, so it is thin on
 things sold without a pack: chicken breast, rolled oats, a banana, plain rice. Those are

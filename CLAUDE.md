@@ -188,10 +188,17 @@ multiply. Filled on demand from Open Food Facts barcode lookups, plus manual ent
 | sodium | number | mg per 100 g |
 | raw | json | untouched upstream payload, for later backfill |
 
-**`food_catalog`** (base collection) — a local mirror of the ~75k Open Food Facts
-products sold in AU/NZ. Read-only to clients (`createRule`/`updateRule`/`deleteRule` are
-all null); written only by `scripts/off-import.py` straight to SQLite, because 75k
-inserts over the REST API would take hours. Unique index on `barcode`.
+**`food_catalog`** (base collection) — the local reference mirror: ~75k Open Food Facts
+products sold in AU/NZ, plus the ~1.6k AFCD whole foods. Read-only to clients
+(`createRule`/`updateRule`/`deleteRule` are all null); written only by
+`scripts/off-import.py` and `scripts/afcd-import.py` straight to SQLite, because 75k
+inserts over the REST API would take hours.
+
+`source` (`off` | `afcd`) + `source_id` carry provenance. Two **partial** unique indexes,
+which is the part that bites: `barcode` is unique only `WHERE barcode != ''` (AFCD rows
+have no barcode, and SQLite treats `'' = ''`, so a plain unique index rejects the second
+one), and `(source, source_id)` is unique `WHERE source_id != ''` so re-importing AFCD
+upserts instead of duplicating.
 
 Deliberately **not** merged into `foods`. `foods` means "things I actually eat" and backs
 the manager, favourites and the barcode cache; 75k imported rows would make it a
@@ -201,6 +208,20 @@ refresh can't rewrite macros behind days already logged.
 
 Same reason `resolveBarcode` is now three tiers: `foods` → `food_catalog` → OFF network.
 Most scans never touch the network.
+
+**Barcode is not a usable identity for everything in here.** AFCD whole foods and bakery
+items are sold without a pack, so `barcode` is `''` and `'' = ''` matches every other
+unbarcoded food. Both places that ask "do I already have this?" fall back to exact
+name+brand when there's no barcode — `ensureFoodFromCatalog` (which otherwise created a
+fresh `foods` row on *every* log of the same AFCD food) and `FoodPickerSheet`'s dedupe of
+catalog hits against your library (which otherwise showed them in both sections). Exact
+match, not `~`: "Banana, cavendish, peeled, raw" and "Banana, frozen" are different foods.
+
+`searchCatalog` fires **two** queries and merges them — a general one and one restricted
+to `source = 'afcd'`. PocketBase sorts and truncates server-side, and OFF outnumbers AFCD
+47:1, so a single query for "chicken breast" filled all 20 slots with branded schnitzels
+before ever reaching "Chicken, breast, lean flesh, raw" — the exact query AFCD exists to
+answer. Whole foods get their own slots rather than competing for the same page.
 
 ### Unit vs pack serving vs portion
 
@@ -392,6 +413,45 @@ pure fat is 900 — and always an upstream entry error).
 `aggregated_set.per` is the subtle one: `100g`/`100ml` are taken at face value,
 `serving` is scaled by `serving_quantity`, and anything else is **skipped** rather than
 assumed, since guessing the basis silently corrupts the macros.
+
+## AFCD whole foods
+
+```
+AFCD Release 3 - Nutrient profiles.xlsx (2.1 MB, FSANZ)
+   │  DuckDB `excel` extension → CSV, columns matched by name in Python
+   ▼
+food_catalog  (1,588 rows, source='afcd')        [~1 s, one-off]
+```
+
+`python3 scripts/afcd-import.py` (`--xlsx` to reuse a local workbook; files live in
+`/data/afcd`). Covers what OFF covers worst — chicken breast, rolled oats, a banana,
+plain rice — because OFF is a *barcode* database and those are sold without a pack.
+
+**Not a sync, and deliberately no timer.** AFCD changes on the order of years, so re-run
+it by hand when FSANZ publishes a new release. Upserts on `(source, source_id)` — AFCD's
+"Public Food Key" — so re-running is idempotent.
+
+Three decisions in the extract that must not be "simplified":
+
+- **Energy "with dietary fibre"**, not without — that's the figure an Australian nutrition
+  panel states, so it matches the OFF/packet rows already in the catalog. kJ→kcal at 4.184.
+- **"Available carbohydrate, with sugar alcohols"** for `carbs` — the AU convention is
+  carbohydrate *excluding* fibre, unlike the US "total carbohydrate".
+- Only the **"All solids & liquids per 100 g"** sheet. The workbook's "Liquids only per
+  100 mL" sheet is the same foods restated per volume; importing both duplicates every drink.
+
+Columns are matched by *name* in Python, not by position in SQL — the sheet is 90 columns
+wide with embedded newlines in the headers. A renamed header **exits with an error** rather
+than importing a column of zeros, which would otherwise look like a clean run.
+
+Sodium is already mg in AFCD (no conversion, unlike OFF). `barcode`, `brand` and
+`serving_g` are empty: these are generic foods with no pack.
+
+**FSANZ Branded Food Database** (the GTIN-keyed branded one, with GS1) is *not* importable
+— as of Aug 2026 there is still no public download, only a submission portal for
+manufacturers, and the published subset is permission-gated per data provider. CalorieKing
+AU is commercial licence only (no pricing, no self-serve, no free tier). Both were checked;
+neither is a route.
 
 ## Dependencies
 

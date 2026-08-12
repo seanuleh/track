@@ -79,8 +79,13 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
         const [a, b] = await Promise.all([searchFoods(query), searchCatalog(query)])
         if (cancelled) return
         setMine(a)
-        const known = new Set(a.map(f => f.barcode).filter(Boolean))
-        setCatalog(b.filter(c => !known.has(c.barcode)))
+        // Hide catalog rows already in your library. Barcode is the identity
+        // where there is one; AFCD whole foods and bakery items have none, so
+        // they fall back to name+brand — otherwise every food you'd already
+        // added showed up twice, once per section.
+        const key = f => f.barcode || `${f.name}|${f.brand || ''}`
+        const known = new Set(a.map(key))
+        setCatalog(b.filter(c => !known.has(key(c))))
       } catch (err) {
         setStatus('Search failed — ' + err.message)
       }
@@ -90,16 +95,23 @@ export default function FoodPickerSheet({ meal, date, onClose, onLogged }) {
 
   async function handleDetected(barcode) {
     setScanning(false)
-    setStatus('Looking up…')
+    setStatus(`Looking up ${barcode}…`)
+    // The scanned digits are the only evidence of why a scan missed — a
+    // misread differs from a genuinely absent product, and without the number
+    // the two are indistinguishable after the fact.
+    console.log('[scan] detected', barcode)
     try {
       const { food, origin } = await resolveBarcode(barcode)
+      console.log('[scan]', barcode, food ? `→ ${origin}: ${food.name}` : '→ no match')
       setStatus(null)
       setEntry({ food, barcode })
-      if (origin === 'catalog') setStatus('Found in the local Open Food Facts catalog')
-      else if (origin === 'off') setStatus('Added from Open Food Facts')
+      if (origin === 'cache') setStatus(`Barcode ${barcode}`)
+      else if (origin === 'catalog') setStatus(`Barcode ${barcode} — found in the local Open Food Facts catalog`)
+      else if (origin === 'off') setStatus(`Barcode ${barcode} — added from Open Food Facts`)
+      else setStatus(`Barcode ${barcode} — no match anywhere`)
     } catch (err) {
-      setStatus(null)
-      setStatus('Lookup failed — ' + err.message)
+      console.warn('[scan] lookup failed', barcode, err)
+      setStatus(`Lookup of ${barcode} failed — ${err.message}`)
     }
   }
 
