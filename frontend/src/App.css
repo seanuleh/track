@@ -894,6 +894,26 @@ body {
   border-radius: 8px;
 }
 
+/* kJ readout sat inside the kcal field, for checking against an AU panel */
+.input-with-suffix {
+  position: relative;
+}
+
+.input-with-suffix .form-input {
+  padding-right: 68px;
+}
+
+.input-suffix {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--text-muted);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .form-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -1349,6 +1369,74 @@ body {
   line-height: 1.5;
   color: var(--text-muted);
   margin-bottom: 14px;
+}
+
+/* Barcode line at the foot of the food modals. Sized to read as a hint, not
+   an action — attaching a barcode is a rare, once-per-food job. */
+.barcode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  min-height: 28px;
+}
+
+.barcode-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.barcode-line:disabled { cursor: default; }
+.barcode-line:active { color: var(--text); }
+@media (hover: hover) {
+  .barcode-line:hover:not(:disabled) { color: var(--text); }
+}
+
+.barcode-glyph {
+  width: 16px;
+  height: 12px;
+  flex: none;
+  fill: currentColor;
+  opacity: 0.75;
+}
+
+.barcode-value--unset { opacity: 0.7; font-style: italic; }
+
+.barcode-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.barcode-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+
+.barcode-btn--go { color: var(--accent); }
+.barcode-btn:active { border-color: var(--text-muted); }
+@media (hover: hover) {
+  .barcode-btn:hover { border-color: var(--text-muted); color: var(--text); }
 }
 
 .log-list {

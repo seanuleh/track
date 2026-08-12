@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFood, logFood, updateLog, deleteLog, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 import ConfirmModal from './ConfirmModal.jsx'
+import BarcodeRow from './BarcodeRow.jsx'
 import { today, shiftDate } from '../dates.js'
 import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
@@ -210,6 +211,12 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
             <div><strong>{preview.fat.toFixed(1)}</strong><span>fat</span></div>
             <div><strong>{preview.carbs.toFixed(1)}</strong><span>carbs</span></div>
           </div>
+
+          {/* A food already in the library can have its barcode attached or
+              corrected from here — the diary is where a missing one is
+              noticed. Manual entry has no record to write to yet; its barcode
+              comes from the scan that opened this modal. */}
+          {!isManual && food?.id && <BarcodeRow food={food} />}
 
           {error && <div className="form-error">{error}</div>}
 

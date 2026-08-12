@@ -74,6 +74,15 @@ const EXTRA_FIELDS = [
   { key: 'sodium', label: 'Sodium (mg)' },
 ]
 
+// AU panels print kJ, often without a Cal figure, so the kcal we store can't be
+// eyeballed against the label directly. Show the kJ equivalent live inside the
+// field instead — same 4.184 used by the vision hook and the OFF importer.
+function kjSuffix(kcal) {
+  const n = parseFloat(kcal)
+  if (!isFinite(n) || n <= 0) return ''
+  return `${Math.round(n * 4.184)} kJ`
+}
+
 export default function FoodForm({ form, onChange, showExtras = false }) {
   const set = (key, value) => onChange({ ...form, [key]: value })
   const unitName = form.unit_label.trim() || 'unit'
@@ -170,12 +179,17 @@ export default function FoodForm({ form, onChange, showExtras = false }) {
         {MACRO_FIELDS.map(({ key, label }) => (
           <div className="form-group form-group--compact" key={key}>
             <label className="form-label">{label}</label>
-            <input
-              className="form-input form-input--compact"
-              type="number" inputMode="decimal" step="any" min="0"
-              value={form[key]}
-              onChange={e => set(key, e.target.value)}
-            />
+            <div className="input-with-suffix">
+              <input
+                className="form-input form-input--compact"
+                type="number" inputMode="decimal" step="any" min="0"
+                value={form[key]}
+                onChange={e => set(key, e.target.value)}
+              />
+              {key === 'kcal' && kjSuffix(form.kcal) && (
+                <span className="input-suffix">{kjSuffix(form.kcal)}</span>
+              )}
+            </div>
           </div>
         ))}
       </div>

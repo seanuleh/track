@@ -65,7 +65,7 @@ export default function Scanner({ onDetected, onClose }) {
         try {
           const codes = await detector.detect(video)
           if (codes.length > 0 && codes[0].rawValue) {
-            handleHit(codes[0].rawValue)
+            handleHit(codes[0].rawValue, codes[0].format)
             return
           }
         } catch {
@@ -85,14 +85,17 @@ export default function Scanner({ onDetected, onClose }) {
 
       const reader = new BrowserMultiFormatReader()
       const controls = await reader.decodeFromVideoElement(video, result => {
-        if (result) handleHit(result.getText())
+        if (result) handleHit(result.getText(), String(result.getBarcodeFormat?.() ?? 'zxing'))
       })
       return () => controls.stop()
     }
 
-    function handleHit(value) {
+    function handleHit(value, format) {
       if (stoppedRef.current) return
       stoppedRef.current = true
+      // Logged with the symbology because a UPC-A read of an EAN-13 pack comes
+      // back a digit short, which looks like a missing product downstream.
+      console.log('[scan] read', value, `(${format || 'unknown'}, ${value.length} digits)`)
       if (navigator.vibrate) navigator.vibrate(60)
       onDetected(value)
     }

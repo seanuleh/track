@@ -148,9 +148,11 @@ export default function FoodsView() {
 
   async function handleDetected(barcode) {
     setScanning(false)
-    setStatus('Looking up…')
+    setStatus(`Looking up ${barcode}…`)
+    console.log('[scan] detected', barcode)
     try {
-      const { food } = await resolveBarcode(barcode)
+      const { food, origin } = await resolveBarcode(barcode)
+      console.log('[scan]', barcode, food ? `→ ${origin}: ${food.name}` : '→ no match')
       setStatus(null)
       // Always land in the edit form — hit or miss — so a scan from the
       // manager is a review-and-fix step, never a silent write.

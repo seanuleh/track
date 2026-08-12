@@ -3,6 +3,7 @@ import { createFood, updateFood, deleteFood, countLogsForFood, extractNutritionF
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 import ConfirmModal from './ConfirmModal.jsx'
+import BarcodeRow from './BarcodeRow.jsx'
 
 // Keeps the upload small and the vision model fast — a nutrition panel is
 // legible from a phone camera well below full resolution.
@@ -149,8 +150,8 @@ export default function FoodEditModal({ food, barcode, onSaved, onClose }) {
 
           <FoodForm form={form} onChange={setForm} showExtras />
 
-          {!isNew && food.barcode && (
-            <div className="food-hint">Barcode {food.barcode} · source {food.source || 'manual'}</div>
+          {!isNew && (
+            <BarcodeRow food={food} suffix={`source ${food.source || 'manual'}`} />
           )}
           {isNew && barcode && (
             <div className="food-hint">Barcode {barcode} isn't on record yet — add it once and it's saved for good.</div>

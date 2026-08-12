@@ -68,7 +68,37 @@ async function stability(page, label) {
   await page.locator('.log-card', { hasText: 'Chicken Breast' }).first().click()
   await page.waitForTimeout(400)
   p = page.locator('.btn', { hasText: 'Edit' }).first().click()
-  await stability(page, 'FoodEditModal'); await p; await esc()
+  await stability(page, 'FoodEditModal'); await p
+
+  // kJ readout inside the kcal field: must track edits live and not sit on top of
+  // the typed number (AU panels print kJ, so this is how a scan gets validated).
+  {
+    const kcal = page.locator('.input-with-suffix .form-input').first()
+    await kcal.fill('200')
+    await page.waitForTimeout(150)
+    const geo = await page.evaluate(() => {
+      const wrap = document.querySelector('.input-with-suffix')
+      const inp = wrap.querySelector('.form-input')
+      const sfx = wrap.querySelector('.input-suffix')
+      if (!sfx) return null
+      const i = inp.getBoundingClientRect(), s = sfx.getBoundingClientRect()
+      return {
+        text: sfx.textContent,
+        overflowsField: s.right > i.right + 1,
+        padRight: getComputedStyle(inp).paddingRight,
+        suffixWidth: Math.round(s.width),
+      }
+    })
+    if (!geo) console.log('[cover] kcal kJ suffix: MISSING')
+    else {
+      const ok = geo.text === '837 kJ' && !geo.overflowsField &&
+        parseFloat(geo.padRight) >= geo.suffixWidth + 8
+      console.log(`  kcal kJ suffix: 200 kcal → "${geo.text}" ` +
+        `(pad ${geo.padRight} vs ${geo.suffixWidth}px) ${ok ? 'ok' : '** BAD **'}`)
+    }
+    await page.screenshot({ path: `${OUT}/food-edit-kj.png` })
+  }
+  await esc()
 
   // Recipe log (edit-before-log) — resolves each ingredient's food record.
   await goTab('Foods')

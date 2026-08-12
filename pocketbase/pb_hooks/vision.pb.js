@@ -22,8 +22,8 @@ routerAdd("POST", "/api/vision/nutrition", (c) => {
     'Step 1 — transcribe ONLY these exact row labels, reading straight across each row, ' +
     'taking the number from the rightmost column (headed "Avg Quantity per 100g" or ' +
     '"per 100mL" — NOT the "per serving" column, which is to its left):\n' +
-    '- "Energy" → write down BOTH the kJ number and the Cal number in brackets next to it, ' +
-    'e.g. "2058 kJ (492 Cal)"\n' +
+    '- "Energy" → write down the number(s) exactly as printed WITH their units, e.g. ' +
+    '"2058 kJ (492 Cal)", or "618 kJ" if only kJ is printed. Do not convert anything.\n' +
     '- "Protein"\n' +
     '- "Fat, Total" (NOT "- saturated", which is a sub-row directly below it — skip that line)\n' +
     '- "Carbohydrate" (NOT "- sugars", which is a sub-row directly below it — skip that line)\n' +
@@ -33,12 +33,15 @@ routerAdd("POST", "/api/vision/nutrition", (c) => {
     '- "Serving size" (from the header area, in g or mL)\n\n' +
     'Step 2 — write ONLY a JSON object from your Step 1 transcription, no markdown, no ' +
     'explanation, matching this shape: ' +
-    '{"kcal_per_100": number, "protein_g_per_100": number, "fat_g_per_100": number, ' +
+    '{"energy_per_100": number, "energy_unit": "kJ" | "kcal", "protein_g_per_100": number, ' +
+    '"fat_g_per_100": number, ' +
     '"carbs_g_per_100": number, "fiber_g_per_100": number, "sugar_g_per_100": number, ' +
     '"sodium_mg_per_100": number, "serving_g_or_ml": number}.\n' +
     'Rules for Step 2:\n' +
-    '- kcal_per_100 is the Cal number from the Energy row\'s brackets, e.g. "2058 kJ (492 Cal)" ' +
-    'means kcal_per_100 is 492. NEVER put the kJ number into kcal_per_100.\n' +
+    '- Do NOT convert between kJ and Cal/kcal. Copy one number straight from the Energy row ' +
+    'and say which unit it was printed in. If the label prints Cal/kcal, use that number with ' +
+    '"energy_unit": "kcal"; if it prints only kJ, use the kJ number with "energy_unit": "kJ". ' +
+    'e.g. "2058 kJ (492 Cal)" → 492 + "kcal"; "618 kJ" → 618 + "kJ".\n' +
     '- fat_g_per_100 comes from the "Fat, Total" row, never from "- saturated".\n' +
     '- carbs_g_per_100 comes from the "Carbohydrate" row, never from "- sugars".\n' +
     '- If a value reads "LESS THAN X" or "Not Detected", use 0.\n' +
@@ -76,6 +79,25 @@ routerAdd("POST", "/api/vision/nutrition", (c) => {
   } catch (e) {
     return c.json(502, { error: "vision model returned invalid JSON" })
   }
+
+  // Energy is returned as a value + the unit it was PRINTED in — the model must not
+  // convert (it kept copying kJ straight into a kcal field on kJ-only labels, e.g. the
+  // Korean rice pack: 618 kJ read as 618 kcal). We do the 4.184 divide here instead,
+  // the same constant the OFF importer uses.
+  if (parsed.energy_per_100 != null && parsed.kcal_per_100 == null) {
+    const unit = String(parsed.energy_unit || "").toLowerCase()
+    const val = Number(parsed.energy_per_100)
+    if (isFinite(val)) {
+      parsed.kcal_per_100 = unit === "kj" ? Math.round(val / 4.184) : Math.round(val)
+    }
+  }
+  // Backstop: >900 kcal/100 g is impossible (pure fat is 900) and always means a kJ
+  // figure slipped through mislabelled.
+  if (Number(parsed.kcal_per_100) > 900) {
+    parsed.kcal_per_100 = Math.round(Number(parsed.kcal_per_100) / 4.184)
+  }
+  delete parsed.energy_per_100
+  delete parsed.energy_unit
 
   return c.json(200, parsed)
 }, $apis.requireRecordAuth())
