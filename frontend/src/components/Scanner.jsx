@@ -6,6 +6,13 @@ const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e']
 
 const supportsNative = () => typeof window !== 'undefined' && 'BarcodeDetector' in window
 
+// A single decode is not trustworthy. A barcode wrapped around a curved or
+// tapered container distorts the bar widths, and the decoder can return a
+// *different wrong* number on each frame — three such reads of one pudding tub
+// (2026-08-15) all carried valid EAN-13 check digits, so the checksum rejects
+// nothing here. Requiring the same value on consecutive good frames does.
+const REQUIRED_AGREEMENTS = 3
+
 /**
  * Camera barcode scanner.
  *
@@ -20,10 +27,12 @@ export default function Scanner({ onDetected, onClose }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const stoppedRef = useRef(false)
+  const candidateRef = useRef({ value: null, count: 0 })
   const [error, setError] = useState(null)
 
   useEffect(() => {
     stoppedRef.current = false
+    candidateRef.current = { value: null, count: 0 }
     let cleanupDecoder = null
 
     async function start() {
@@ -65,8 +74,8 @@ export default function Scanner({ onDetected, onClose }) {
         try {
           const codes = await detector.detect(video)
           if (codes.length > 0 && codes[0].rawValue) {
-            handleHit(codes[0].rawValue, codes[0].format)
-            return
+            // Keep polling until the same value has come back enough times.
+            if (handleHit(codes[0].rawValue, codes[0].format)) return
           }
         } catch {
           // Transient decode errors are normal between good frames — keep going.
@@ -90,14 +99,32 @@ export default function Scanner({ onDetected, onClose }) {
       return () => controls.stop()
     }
 
+    // Returns true once a value has been confirmed and handed on, false while
+    // still gathering agreement (callers on the native path keep polling).
     function handleHit(value, format) {
-      if (stoppedRef.current) return
-      stoppedRef.current = true
+      if (stoppedRef.current) return true
+
+      const candidate = candidateRef.current
+      // A disagreeing read restarts the count at the new value rather than
+      // merely resetting: the fresh read is as good a candidate as any.
+      candidateRef.current =
+        candidate.value === value
+          ? { value, count: candidate.count + 1 }
+          : { value, count: 1 }
+
+      const { count } = candidateRef.current
       // Logged with the symbology because a UPC-A read of an EAN-13 pack comes
       // back a digit short, which looks like a missing product downstream.
-      console.log('[scan] read', value, `(${format || 'unknown'}, ${value.length} digits)`)
+      console.log(
+        '[scan] read', value,
+        `(${format || 'unknown'}, ${value.length} digits, ${count}/${REQUIRED_AGREEMENTS})`
+      )
+      if (count < REQUIRED_AGREEMENTS) return false
+
+      stoppedRef.current = true
       if (navigator.vibrate) navigator.vibrate(60)
       onDetected(value)
+      return true
     }
 
     start()
