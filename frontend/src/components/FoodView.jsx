@@ -357,6 +357,7 @@ export default function FoodView() {
         <CopyDateModal
           logs={copying.logs}
           label={copying.label}
+          sourceDate={date}
           onClose={() => setCopying(null)}
           onCopied={() => { setCopying(null); load() }}
         />

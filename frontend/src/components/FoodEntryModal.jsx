@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFood, logFood, updateLog, deleteLog, macrosFor, gramsFor, ensureFoodFromCatalog, portionOf } from '../food/api.js'
 import FoodForm, { formFromFood, foodFromForm } from './FoodForm.jsx'
 import ConfirmModal from './ConfirmModal.jsx'
+import CopyDateModal from './CopyDateModal.jsx'
 import BarcodeRow from './BarcodeRow.jsx'
 import { today, shiftDate } from '../dates.js'
 import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
@@ -50,6 +51,7 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [copying, setCopying] = useState(false)
   const [error, setError] = useState(null)
 
   // Manual-entry fields — the same form the Foods manager uses.
@@ -226,6 +228,14 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
                 {deleting ? 'Removing…' : 'Delete'}
               </button>
             )}
+            {/* Changing the Date field above *moves* the entry. Copy leaves the
+                day being viewed intact and writes a new row elsewhere — the
+                case of standing on a past day and pulling one item onto today. */}
+            {isEditing && (
+              <button type="button" className="btn btn-ghost" onClick={() => setCopying(true)} disabled={deleting || saving}>
+                Copy
+              </button>
+            )}
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving || deleting}>
               {saving ? 'Saving…' : (isEditing ? 'Save' : 'Log it')}
@@ -234,6 +244,16 @@ export default function FoodEntryModal({ food, catalog, barcode, log, date: pres
         </form>
       </div>
     </div>
+
+    {copying && (
+      <CopyDateModal
+        logs={[log]}
+        label={`Copy ${food?.name || 'entry'}`}
+        sourceDate={log.date}
+        onClose={() => setCopying(false)}
+        onCopied={() => { setCopying(false); onSaved() }}
+      />
+    )}
 
     {confirmDelete && (
       <ConfirmModal

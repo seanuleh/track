@@ -3,18 +3,26 @@ import { copyLogs } from '../food/api.js'
 import { today, shiftDate, formatDisplayDate } from '../dates.js'
 import { useEscapeClose, onFormKeyDown, overlayDismiss } from '../modalKeys.js'
 
-const NEXT_7_DAYS = Array.from({ length: 7 }, (_, i) => shiftDate(today(), i + 1))
+// Today plus the next 6 days. Today is in the list deliberately: the common
+// case is standing on a past day and pulling one thing forward onto today.
+// The day being copied *from* is dropped, since copying a row onto its own
+// day just duplicates it.
+function targetDays(sourceDate) {
+  const days = Array.from({ length: 7 }, (_, i) => shiftDate(today(), i))
+  return days.filter(d => d !== sourceDate)
+}
 
 /**
- * Copies a set of already-fetched food_logs rows (a meal, or a whole day)
- * onto one or more of the next 7 days — new rows, not moved ones, so the
- * source day is untouched. `label` distinguishes "Copy meal" from "Copy day"
- * in the title. Checkbox list rather than a single date picker, so a whole
- * week can be seeded in one submit instead of one modal open per day.
+ * Copies a set of already-fetched food_logs rows (a single item, a meal, or a
+ * whole day) onto one or more of the next 7 days — new rows, not moved ones,
+ * so the source day is untouched. `label` distinguishes "Copy meal" from
+ * "Copy day" in the title. Checkbox list rather than a single date picker, so
+ * a whole week can be seeded in one submit instead of one modal open per day.
  */
-export default function CopyDateModal({ logs, label, onCopied, onClose }) {
+export default function CopyDateModal({ logs, label, sourceDate, onCopied, onClose }) {
   useEscapeClose(onClose)
-  const [selected, setSelected] = useState(() => new Set([NEXT_7_DAYS[0]]))
+  const days = targetDays(sourceDate)
+  const [selected, setSelected] = useState(() => new Set(days.slice(0, 1)))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -60,7 +68,7 @@ export default function CopyDateModal({ logs, label, onCopied, onClose }) {
             <div className="form-label-row">
               <label className="form-label">Copy to</label>
               <div className="form-label-actions">
-                <button type="button" className="link-btn" onClick={() => setSelected(new Set(NEXT_7_DAYS))}>
+                <button type="button" className="link-btn" onClick={() => setSelected(new Set(days))}>
                   Select all
                 </button>
                 <button type="button" className="link-btn" onClick={() => setSelected(new Set())}>
@@ -69,7 +77,7 @@ export default function CopyDateModal({ logs, label, onCopied, onClose }) {
               </div>
             </div>
             <div className="copy-date-list">
-              {NEXT_7_DAYS.map(date => (
+              {days.map(date => (
                 <label key={date} className="copy-date-row">
                   <input
                     type="checkbox"
