@@ -146,9 +146,11 @@ Auth is handled by the cf-auth sidecar outside the container — no auth code in
 One JSVM hook exists: `pb_hooks/vision.pb.js`, `POST /api/vision/nutrition`, record-auth only.
 It exists solely because the browser can reach `track` but not `ollama` — both sit on the
 internal `pirate` docker network, only the container can call the model directly. It proxies
-a base64 JPEG to `qwen2.5vl:7b` on the shared Ollama instance (`OLLAMA_URL` env, defaults to
+a base64 JPEG to `qwen3-vl:4b` on the shared Ollama instance (`OLLAMA_URL` env, defaults to
 `http://ollama:11434`) and returns extracted per-100g macros. Local model deliberately, not
 Anthropic — no API key, no separate billing, and Claude usage/quota changes can't break it.
+Model switched from `qwen2.5vl:7b` to `qwen3-vl:4b` on 2026-09-23 (smaller VRAM footprint,
+better reads — see `~/docs/ai-setup.md`); the accuracy notes below were gathered on `qwen2.5vl:7b`.
 Evaluated against 3 real AU nutrition panels (milk, cheese, chocolate) with 8/8 fields exact
 on every one — no accuracy gap found against Claude Haiku on the same images. A denser real
 label (rice crackers, with Gluten/Monounsaturated/Polyunsaturated/Trans Fats sub-rows) then

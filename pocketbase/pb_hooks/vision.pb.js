@@ -52,7 +52,7 @@ routerAdd("POST", "/api/vision/nutrition", (c) => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: $os.getenv("VISION_MODEL") || "qwen2.5vl:7b",
+      model: $os.getenv("VISION_MODEL") || "qwen3-vl:4b",
       messages: [{ role: "user", content: prompt, images: [image] }],
       stream: false,
     }),

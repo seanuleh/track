@@ -240,7 +240,7 @@ export async function countLogsForFood(foodId) {
  */
 /**
  * Snap a nutrition panel and get back per-100g macros, via the local
- * `pb_hooks/vision.pb.js` proxy to Ollama (qwen2.5vl) — never Anthropic, so
+ * `pb_hooks/vision.pb.js` proxy to Ollama (qwen3-vl) — never Anthropic, so
  * this costs nothing and never touches an API key or CLI subscription.
  *
  * `imageBase64` is raw base64, no data-URL prefix. Field names match the
